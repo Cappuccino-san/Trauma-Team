@@ -5,6 +5,10 @@ edition = "2021"
 authors = ["Senior HEMS Operations & Software Architecture"]
 description = "Strict Rust structs with zero-cost abstractions for Rotorcraft Flight Manual (RFM) performance and Mass & Balance under FAA Part 135"
 
+[lib]
+name = "traumateam_rfm"
+crate-type = ["rlib", "cdylib", "staticlib"]
+
 [dependencies]
 serde = { version = "1.0", features = ["derive"], optional = true }
 

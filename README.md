@@ -6,42 +6,63 @@ Rather than relying on simplified rule-of-thumb weight or static ceiling thresho
 
 ---
 
-System Architecture:
+## System Architecture
 
-Physics & Kinematics Engine (Rust): Computes In-Ground-Effect (IGE) and Out-of-Ground-Effect (OGE) hover ceilings, continuous fuel burn schedules, and shifting Center of Gravity (CG) envelopes with zero-cost abstractions.
+- **Physics & Kinematics Engine (Rust / C-FFI)**: Computes In-Ground-Effect (IGE) and Out-of-Ground-Effect (OGE) hover ceilings, One-Engine-Inoperative (OEI) Category A helipad limits, continuous fuel burn schedules, and shifting Center of Gravity (CG) envelopes with zero-cost abstractions (`crates/traumateam_rfm`). Exposes a C-compatible ABI (`src/ffi.rs`) for native cross-language invocation.
+- **Telemetry & Compliance (Go / gRPC / cgo)**: Ingests live NOAA weather feeds (METAR, TAF, Winds Aloft, SIGMETs), invokes the Rust physics engine natively via `cgo` (`services/weather_ingest/pkg/kinematics`), and automatically enforces FAR 135.609 / 135.615 VFR/IFR visibility minimums and mandatory fuel reserves.
+- **Dispatcher Avionics UI (Svelte)**: A strict-minimalism WebSocket dashboard (`frontend/`) that pushes real-time, deterministic `GO` / `CAUTION` / `NO-GO` dispatch verdicts and precise limiting factors directly to operators.
 
-Telemetry & Compliance (Go/gRPC): Ingests live NOAA weather feeds (METAR, TAF, SIGMETs) and automatically enforces FAR 135.615 VFR/IFR visibility minimums and mandatory fuel reserves.
-
-Dispatcher Avionics UI (Svelte): A strict-minimalism WebSocket dashboard that pushes real-time, deterministic GO/NO-GO dispatch verdicts and precise limiting factors directly to operators.
+---
 
 ## Architecture Overview
 
 ```mermaid
+%%{init: {'flowchart': {'nodeSpacing': 35, 'rankSpacing': 45, 'padding': 16}}}%%
 flowchart TD
-    subgraph Data_Model ["Airframe Performance & Mass/Balance Data Model"]
-        RFM[Raw RFM Tabular Data: Airbus H145 / Bell 429]
-        STATIONS[Station Arms: Crew, Litters, ECMO/IABP, Fuel Tanks]
-        INTERP[SciPy RegularGridInterpolator: IGE, OGE, OEI Cat A, Cruise FF]
+    subgraph Data_Model ["Airframe Performance & Mass/Balance Core (Rust)"]
+        direction TB
+        RFM["OEM RFM Tabular Data
+        (Airbus H145 / Bell 429)"]
+        STATIONS["Airframe Station Arms
+        (Crew, Litters, ECMO, Fuel)"]
+        INTERP["2D/3D Grid Interpolators
+        (IGE, OGE, OEI Cat A, Cruise FF)"]
+        RFM --> STATIONS --> INTERP
     end
 
-    subgraph State_Machine ["Sequential Kinematic Integrator"]
-        LEG0[Leg 0: Base Startup & Warmup] --> LEG1[Leg 1: Outbound Scene Transit]
-        LEG1 --> LEG2[Leg 2: Scene OGE/IGE Hover & Patient Load]
-        LEG2 --> LEG3[Leg 3: Inbound Hospital Transit]
-        LEG3 --> LEG4[Leg 4: Helipad Landing & OEI Cat A Check]
-        LEG4 --> LEG5[Leg 5: Return Base Transit]
-        LEG5 --> LEG6[Leg 6: Base Shutdown & Reserve Check]
+    subgraph Regulatory_Engine ["FAR Part 135 Subpart L Rule Engine (Go)"]
+        direction TB
+        FAR615["14 CFR 135.609 / 135.615
+        (VFR Minimums Matrix)"]
+        FAR209["14 CFR 135.209
+        (20m VFR / 30m IFR Reserves)"]
+        TERRAIN["14 CFR 135.203 / 135.615
+        (Terrain & Obstacle Clearance)"]
+        FAR615 --> FAR209 --> TERRAIN
     end
 
-    subgraph Regulatory_Engine ["FAR Part 135 Subpart L Rule Engine"]
-        FAR615[14 CFR 135.615: VFR Minimums Matrix]
-        FAR209[14 CFR 135.209: 20-min VFR / 30-min IFR Reserves]
-        TERRAIN[14 CFR 135.203: Terrain & Obstacle Clearance]
+    subgraph State_Machine ["Sequential 7-Leg Kinematic Integrator"]
+        direction TB
+        LEG0["Leg 0: Base Startup & Warmup"]
+        LEG1["Leg 1: Outbound Scene Transit"]
+        LEG2["Leg 2: Scene OGE/IGE Hover
+        & Patient Load"]
+        LEG3["Leg 3: Inbound Hospital Transit"]
+        LEG4["Leg 4: Helipad Landing
+        & OEI Cat A Check"]
+        LEG5["Leg 5: Return Base Transit"]
+        LEG6["Leg 6: Base Shutdown
+        & Reserve Check"]
+        LEG0 --> LEG1 --> LEG2 --> LEG3 --> LEG4 --> LEG5 --> LEG6
     end
 
-    Data_Model --> State_Machine
-    Regulatory_Engine --> State_Machine
-    State_Machine --> DECISION[TraumaTeam Dispatch Verdict: GO / CAUTION / NO-GO]
+    DECISION["TraumaTeam Dispatch Verdict
+    (GO / CAUTION / NO-GO)
+    Streamed via WebSocket to Svelte UI"]
+
+    INTERP --> LEG0
+    TERRAIN --> LEG0
+    LEG6 --> DECISION
 ```
 
 ---
@@ -101,6 +122,16 @@ TraumaTeam includes a pytest + Hypothesis test suite validating RFM chart values
 
 Run test suite:
 ```bash
+# Python Reference & Property Tests
 python -m pytest -v
 python demo_dispatch.py
+
+# Rust RFM & FFI Core
+cd crates/traumateam_rfm && cargo test
+
+# Go Weather Ingest & FFI Bridge
+cd services/weather_ingest && go test ./...
+
+# Svelte Dispatcher Console
+cd frontend && npm test
 ```

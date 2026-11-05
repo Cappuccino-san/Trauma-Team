@@ -5,12 +5,19 @@
 //! evaluations conforming to FAA Part 135 Subpart L.
 
 pub mod airframes;
+pub mod ffi;
 pub mod interpolator;
 pub mod mass_balance;
 pub mod rfm;
 pub mod units;
 
 pub use airframes::{get_bell429_rfm_spec, get_h145_rfm_spec};
+pub use ffi::{
+    traumateam_compute_atmosphere_ffi, traumateam_eval_mass_balance_ffi,
+    traumateam_eval_mission_kinematics_ffi, traumateam_ffi_abi_version, FfiAirframeId,
+    FfiLimitingFactorCode, FfiMassBalanceResult, FfiPayloadItem, FfiPerformanceKinematicResult,
+    FfiStationId, FfiVerdictCode, FfiWeatherMissionInput,
+};
 pub use interpolator::{CruisePerformanceGrid3D, PerformanceGrid2D};
 pub use mass_balance::{compute_mass_and_balance, MassBalanceError, MassBalanceSnapshot};
 pub use rfm::{
