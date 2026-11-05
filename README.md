@@ -17,52 +17,38 @@ Rather than relying on simplified rule-of-thumb weight or static ceiling thresho
 ## Architecture Overview
 
 ```mermaid
-%%{init: {'flowchart': {'nodeSpacing': 35, 'rankSpacing': 45, 'padding': 16}}}%%
 flowchart TD
-    subgraph Data_Model ["Airframe Performance & Mass/Balance Core (Rust)"]
-        direction TB
-        RFM["OEM RFM Tabular Data
-        (Airbus H145 / Bell 429)"]
-        STATIONS["Airframe Station Arms
-        (Crew, Litters, ECMO, Fuel)"]
-        INTERP["2D/3D Grid Interpolators
-        (IGE, OGE, OEI Cat A, Cruise FF)"]
+    subgraph RustCore ["Rust RFM Core"]
+        RFM["Airbus H145 & Bell 429"]
+        STATIONS["Mass & CG Envelopes"]
+        INTERP["2D & 3D RFM Grids"]
         RFM --> STATIONS --> INTERP
     end
 
-    subgraph Regulatory_Engine ["FAR Part 135 Subpart L Rule Engine (Go)"]
-        direction TB
-        FAR615["14 CFR 135.609 / 135.615
-        (VFR Minimums Matrix)"]
-        FAR209["14 CFR 135.209
-        (20m VFR / 30m IFR Reserves)"]
-        TERRAIN["14 CFR 135.203 / 135.615
-        (Terrain & Obstacle Clearance)"]
+    subgraph GoEngine ["Go 14 CFR 135 Engine"]
+        FAR615["135.609 VFR Minimums"]
+        FAR209["135.209 Fuel Reserves"]
+        TERRAIN["135.615 Obstacle Rules"]
         FAR615 --> FAR209 --> TERRAIN
     end
 
-    subgraph State_Machine ["Sequential 7-Leg Kinematic Integrator"]
-        direction TB
-        LEG0["Leg 0: Base Startup & Warmup"]
-        LEG1["Leg 1: Outbound Scene Transit"]
-        LEG2["Leg 2: Scene OGE/IGE Hover
-        & Patient Load"]
-        LEG3["Leg 3: Inbound Hospital Transit"]
-        LEG4["Leg 4: Helipad Landing
-        & OEI Cat A Check"]
-        LEG5["Leg 5: Return Base Transit"]
-        LEG6["Leg 6: Base Shutdown
-        & Reserve Check"]
+    subgraph MissionLoop ["7-Leg Mission Integrator"]
+        LEG0["0. Base Warmup"]
+        LEG1["1. Outbound Transit"]
+        LEG2["2. Scene OGE Hover"]
+        LEG3["3. Hospital Transit"]
+        LEG4["4. Helipad OEI Cat A"]
+        LEG5["5. Return Transit"]
+        LEG6["6. Reserve Check"]
         LEG0 --> LEG1 --> LEG2 --> LEG3 --> LEG4 --> LEG5 --> LEG6
     end
 
-    DECISION["TraumaTeam Dispatch Verdict
-    (GO / CAUTION / NO-GO)
-    Streamed via WebSocket to Svelte UI"]
+    DECISION["Dispatch Verdict: GO / CAUTION / NO-GO"]
+    UI["Svelte Avionics Console (WebSocket)"]
 
     INTERP --> LEG0
     TERRAIN --> LEG0
-    LEG6 --> DECISION
+    LEG6 --> DECISION --> UI
 ```
 
 ---
