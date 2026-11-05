@@ -11,6 +11,8 @@
   onMount(() => {
     // Load initial deterministic NOAA AWC & FAA 14 CFR Part 135 Subpart L simulation state
     loadSimulationScenario(wsRouter, 'NOMINAL_GO');
+    // Connect to the live Go WebSocket Gateway (:8080/ws)
+    wsRouter.connect();
   });
 </script>
 

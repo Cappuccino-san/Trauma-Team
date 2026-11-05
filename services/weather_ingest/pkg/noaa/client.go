@@ -40,6 +40,10 @@ func (c *WeatherFeedClient) initDefaultFixtures() {
 		"KBJC": FixtureMETAR_KBJC,
 		"KCOS": FixtureMETAR_KCOS,
 		"KPUB": FixtureMETAR_P6SM,
+		"KBOS": FixtureMETAR_KBOS,
+		"KPWM": FixtureMETAR_KPWM,
+		"KMHT": FixtureMETAR_KMHT,
+		"KPVD": FixtureMETAR_KPVD,
 	}
 	for station, raw := range metars {
 		if m, err := ParseMETAR(raw); err == nil {
