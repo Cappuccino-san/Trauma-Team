@@ -18,69 +18,73 @@ Rather than relying on simplified rule-of-thumb weight or static ceiling thresho
 
 ```mermaid
 graph LR
-    subgraph ExternalInputs ["External Feeds & Reference Data"]
-        NOAA_FEED["NOAA AWC Feeds (METAR, TAF, FD, SIGMET)"]
-        FAR_RULES["FAA 14 CFR Part 135 Subpart L Rules"]
-        OEM_RFM["Certified OEM RFM Charts (H145 & Bell 429)"]
+    %% Data Inputs
+    subgraph External["External Feeds & Reference Data"]
+        direction LR
+        NOAA["Live NOAA AWC Feeds (METAR/TAF/SIGMET)"]
+        FAA["FAA 14 CFR Part 135 Subpart L Rules"]
+        OEM["Certified OEM RFM Charts (H145 & Bell 429)"]
     end
 
-    subgraph SvelteEdge ["Tier 1: Svelte Edge UI (frontend)"]
-        WS_ROUTER["WebSocket Router (websocket.ts)"]
-        WX_STORE["Reactive Weather Store (weather.ts)"]
-        VERDICT_STORE["Reactive Verdict Store (verdict.ts)"]
-        AVIONICS_UI["Dispatcher Avionics Console (App.svelte)"]
-
-        WS_ROUTER -->|"WEATHER_UPDATE"| WX_STORE
-        WS_ROUTER -->|"MINIMUMS_EVALUATION"| VERDICT_STORE
-        WX_STORE --> AVIONICS_UI
-        VERDICT_STORE --> AVIONICS_UI
-        AVIONICS_UI -->|"ClientEnvelope"| WS_ROUTER
+    %% Tier 1: Svelte Edge UI
+    subgraph UI["Tier 1: Svelte Edge UI (frontend)"]
+        direction LR
+        App["App.svelte (Dispatch Dashboard)"]
+        WSRouter["websocket.ts (Demultiplexer)"]
+        WeatherStore["weather.ts (Reactive Env State)"]
+        VerdictStore["verdict.ts (GO/NO-GO State)"]
+        
+        App -->|Outbound ClientEnvelope| WSRouter
+        WSRouter -->|WEATHER_UPDATE Payload| WeatherStore
+        WSRouter -->|MINIMUMS_EVALUATION Payload| VerdictStore
+        WeatherStore --> App
+        VerdictStore --> App
     end
 
-    subgraph GoGateway ["Tier 2: Go Telemetry & Compliance Gateway (services/weather_ingest)"]
-        GRPC_SRV["gRPC Server (:50051)"]
-        WS_HUB["WebSocket Broadcast Hub (:8080/ws)"]
-        NOAA_PARSER["NOAA Feed Decoders (pkg/noaa)"]
-        FAR_ENGINE["Part 135.L Evaluator (pkg/regulations)"]
-        CGO_BRIDGE["Go cgo FFI Bridge (pkg/kinematics/ffi.go)"]
-
-        NOAA_PARSER --> FAR_ENGINE
-        NOAA_PARSER --> CGO_BRIDGE
-        FAR_ENGINE --> WS_HUB
-        FAR_ENGINE --> GRPC_SRV
-        CGO_BRIDGE --> WS_HUB
-        CGO_BRIDGE --> GRPC_SRV
+    %% Tier 2: Go Telemetry Gateway
+    subgraph Go["Tier 2: Go Telemetry & Compliance Gateway (services/weather_ingest)"]
+        direction LR
+        WSHub["WebSocket Broadcast Hub (:8080/ws)"]
+        GRPC["gRPC Server (:50051)"]
+        NOAADecoder["pkg/noaa (Feed Decoders)"]
+        Regs["pkg/regulations (Part 135.L Evaluator)"]
+        CGOBridge["pkg/kinematics/ffi.go (cgo Bridge)"]
+        
+        WSHub <--> GRPC
+        GRPC <--> NOAADecoder
+        GRPC <--> Regs
+        GRPC <--> CGOBridge
     end
 
-    subgraph RustPhysics ["Tier 3: Rust Physics & RFM Core (crates/traumateam_rfm)"]
-        FFI_ABI["C-ABI FFI Layer (src/ffi.rs)"]
-        MB_SOLVER["Mass & CG Envelope Solver"]
-        GRID_INTERP["Zero-Alloc 2D/3D RFM Interpolators"]
-
-        subgraph SevenLeg ["Sequential 7-Leg Mission Integrator"]
-            L0["Leg 0: Base Startup"]
-            L1["Leg 1: Outbound Transit"]
-            L2["Leg 2: Scene OGE Hover"]
-            L3["Leg 3: Hospital Transit"]
-            L4["Leg 4: Helipad OEI Cat A"]
-            L5["Leg 5: Return Transit"]
-            L6["Leg 6: 135.209 Reserve"]
-            L0 --> L1 --> L2 --> L3 --> L4 --> L5 --> L6
+    %% Tier 3: Rust Physics Core
+    subgraph Rust["Tier 3: Rust Physics & RFM Core (crates/traumateam_rfm)"]
+        direction LR
+        FFI["src/ffi.rs (C-ABI)"]
+        Mass["Mass & CG Envelope Solver"]
+        Interp["Zero-Alloc 2D/3D RFM Interpolators"]
+        
+        subgraph LegIntegrator["Sequential 7-Leg Mission Integrator"]
+            direction LR
+            L0["Leg 0: Base Warmup"] --> L1["Leg 1: Outbound Transit"]
+            L1 --> L2["Leg 2: Scene OGE Hover"]
+            L2 --> L3["Leg 3: Hospital Transit"]
+            L3 --> L4["Leg 4: Helipad OEI Cat A"]
+            L4 --> L5["Leg 5: Return Transit"]
+            L5 --> L6["Leg 6: Reserve Check"]
         end
-
-        FFI_ABI --> MB_SOLVER
-        FFI_ABI --> GRID_INTERP
-        MB_SOLVER --> L0
-        GRID_INTERP --> L0
-        L6 --> FFI_ABI
+        
+        FFI --> Mass
+        Mass --> Interp
+        Interp --> LegIntegrator
     end
 
-    NOAA_FEED -->|"Raw Aviation Text"| NOAA_PARSER
-    FAR_RULES -->|"135.609 & 135.615"| FAR_ENGINE
-    OEM_RFM -->|"Static Tabular Grids"| GRID_INTERP
-
-    WS_ROUTER <-->|"JSON WebSockets (:8080/ws)"| WS_HUB
-    CGO_BRIDGE <-->|"C-ABI FFI (cdylib)"| FFI_ABI
+    %% Cross-Boundary Connections
+    NOAA -->|TCP/REST| NOAADecoder
+    FAA -->|Static Implementation| Regs
+    OEM -->|Static Tabular Grids| Interp
+    
+    WSRouter <-->|JSON WebSockets| WSHub
+    CGOBridge <-->|C-ABI cdylib| FFI
 ```
 
 ---
