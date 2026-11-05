@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"time"
 
+	"traumateam/weather_ingest/pkg/kinematics"
 	"traumateam/weather_ingest/pkg/noaa"
 	"traumateam/weather_ingest/pkg/regulations"
 )
@@ -97,6 +98,52 @@ func NewHandler(hub *Hub, weatherClient *noaa.WeatherFeedClient) http.Handler {
 		report := regulations.EvaluateMinimums(metar, isDay, isMtn, isLocal, nvg)
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(report)
+	})
+
+	// 5. REST API: GET /api/v1/kinematics?station=KAPA
+	mux.HandleFunc("/api/v1/kinematics", func(w http.ResponseWriter, r *http.Request) {
+		station := r.URL.Query().Get("station")
+		if station == "" {
+			station = "KAPA"
+		}
+		if weatherClient == nil {
+			http.Error(w, "weather client not initialized", http.StatusInternalServerError)
+			return
+		}
+
+		metar, err := weatherClient.GetMETAR(r.Context(), station)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusNotFound)
+			return
+		}
+
+		elev := 5885.0
+		if station == "KLXV" {
+			elev = 9927.0
+		} else if station == "KASE" {
+			elev = 7820.0
+		}
+
+		eval, err := kinematics.EvaluateMissionKinematics(kinematics.MissionKinematicsRequest{
+			Airframe:           kinematics.AirframeAirbusH145,
+			StationElevationFt: elev,
+			Weather:            metar,
+			TrueCourseDeg:      270.0,
+			LegDistanceNM:      45.0,
+			FuelWeightKg:       450.0,
+			Payloads: []kinematics.PayloadStationInput{
+				{StationID: kinematics.StationPilotRH, WeightKg: 88.0},
+				{StationID: kinematics.StationCrewAttendantAftLH, WeightKg: 80.0},
+				{StationID: kinematics.StationPrimaryPatientLitter, WeightKg: 92.0},
+			},
+		})
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(eval)
 	})
 
 	return mux

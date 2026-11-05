@@ -2,22 +2,24 @@ package gateway
 
 // Client actions supported by the WebSocket protocol.
 const (
-	ActionSubscribe       = "SUBSCRIBE"
-	ActionUnsubscribe     = "UNSUBSCRIBE"
-	ActionGetConditions   = "GET_CONDITIONS"
-	ActionEvaluateMinimums = "EVALUATE_MINIMUMS"
-	ActionPing            = "PING"
+	ActionSubscribe          = "SUBSCRIBE"
+	ActionUnsubscribe        = "UNSUBSCRIBE"
+	ActionGetConditions      = "GET_CONDITIONS"
+	ActionEvaluateMinimums   = "EVALUATE_MINIMUMS"
+	ActionEvaluateKinematics = "EVALUATE_KINEMATICS"
+	ActionPing               = "PING"
 )
 
 // Server events pushed over the WebSocket connection.
 const (
-	EventWeatherSnapshot   = "WEATHER_SNAPSHOT"
-	EventWeatherUpdate     = "WEATHER_UPDATE"
-	EventMinimumsEvaluation = "MINIMUMS_EVALUATION"
-	EventHazardAlert       = "HAZARD_ALERT"
-	EventPong              = "PONG"
-	EventAck               = "ACK"
-	EventError             = "ERROR"
+	EventWeatherSnapshot      = "WEATHER_SNAPSHOT"
+	EventWeatherUpdate        = "WEATHER_UPDATE"
+	EventMinimumsEvaluation   = "MINIMUMS_EVALUATION"
+	EventKinematicsEvaluation = "KINEMATICS_EVALUATION"
+	EventHazardAlert          = "HAZARD_ALERT"
+	EventPong                 = "PONG"
+	EventAck                  = "ACK"
+	EventError                = "ERROR"
 )
 
 // CorridorParams contains route station parameters.
@@ -46,13 +48,27 @@ type RegulatoryContextParams struct {
 	} `json:"equipment"`
 }
 
+// KinematicsParams contains mission payload and route parameters for Rust FFI evaluation.
+type KinematicsParams struct {
+	AirframeID         uint32  `json:"airframe_id"`
+	StationElevationFt float64 `json:"station_elevation_ft"`
+	TrueCourseDeg      float64 `json:"true_course_deg"`
+	LegDistanceNM      float64 `json:"leg_distance_nm"`
+	FuelWeightKg       float64 `json:"fuel_weight_kg"`
+	Payloads           []struct {
+		StationID uint32  `json:"station_id"`
+		WeightKg  float64 `json:"weight_kg"`
+	} `json:"payloads"`
+}
+
 // ClientParams represents the polymorphic payload in client requests.
 type ClientParams struct {
-	Station           string                  `json:"station,omitempty"`
-	Stations          []string                `json:"stations,omitempty"`
-	Topics            []string                `json:"topics,omitempty"`
-	Corridor          *CorridorParams         `json:"corridor,omitempty"`
+	Station           string                   `json:"station,omitempty"`
+	Stations          []string                 `json:"stations,omitempty"`
+	Topics            []string                 `json:"topics,omitempty"`
+	Corridor          *CorridorParams          `json:"corridor,omitempty"`
 	RegulatoryContext *RegulatoryContextParams `json:"regulatory_context,omitempty"`
+	Kinematics        *KinematicsParams        `json:"kinematics,omitempty"`
 }
 
 // ClientEnvelope defines the inbound JSON contract from frontend clients (e.g. Svelte).

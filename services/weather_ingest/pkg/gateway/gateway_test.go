@@ -272,4 +272,53 @@ func TestGateway_RESTEndpoints(t *testing.T) {
 	if data["station_id"] != "KAPA" {
 		t.Errorf("expected station_id KAPA, got %v", data["station_id"])
 	}
+
+	// 3. GET /api/v1/kinematics?station=KAPA (invokes Rust FFI physics engine)
+	respKin, err := http.Get(server.URL + "/api/v1/kinematics?station=KAPA")
+	if err != nil {
+		t.Fatalf("GET /api/v1/kinematics failed: %v", err)
+	}
+	if respKin.StatusCode != http.StatusOK {
+		t.Errorf("expected 200 OK for /api/v1/kinematics, got %d", respKin.StatusCode)
+	}
+}
+
+func TestGateway_EvaluateKinematicsWebSocketAction(t *testing.T) {
+	_, server, _, cleanup := setupTestGateway(t)
+	defer cleanup()
+
+	conn := dialWS(t, server)
+	defer conn.Close()
+
+	req := ClientEnvelope{
+		Action:    ActionEvaluateKinematics,
+		RequestID: "kin-101",
+		Params: ClientParams{
+			Station: "KAPA",
+			Kinematics: &KinematicsParams{
+				AirframeID:         0,
+				StationElevationFt: 5885.0,
+				TrueCourseDeg:      270.0,
+				LegDistanceNM:      45.0,
+				FuelWeightKg:       450.0,
+			},
+		},
+	}
+
+	if err := conn.WriteJSON(req); err != nil {
+		t.Fatalf("WriteJSON EVALUATE_KINEMATICS failed: %v", err)
+	}
+
+	conn.SetReadDeadline(time.Now().Add(2 * time.Second))
+	var resp ServerEnvelope
+	if err := conn.ReadJSON(&resp); err != nil {
+		t.Fatalf("ReadJSON EVALUATE_KINEMATICS failed: %v", err)
+	}
+
+	if resp.Event != EventKinematicsEvaluation {
+		t.Errorf("expected KINEMATICS_EVALUATION event, got %s", resp.Event)
+	}
+	if resp.RequestID != "kin-101" {
+		t.Errorf("expected request_id kin-101, got %s", resp.RequestID)
+	}
 }

@@ -10,6 +10,7 @@ import (
 
 	"github.com/gorilla/websocket"
 
+	"traumateam/weather_ingest/pkg/kinematics"
 	"traumateam/weather_ingest/pkg/models"
 	"traumateam/weather_ingest/pkg/noaa"
 	"traumateam/weather_ingest/pkg/regulations"
@@ -218,9 +219,84 @@ func (c *Client) handleClientAction(req *ClientEnvelope) {
 		}
 		c.handleEvaluateMinimums(req)
 
+	case ActionEvaluateKinematics:
+		if c.weatherClient == nil {
+			c.sendError(req.RequestID, "weather client not configured")
+			return
+		}
+		c.handleEvaluateKinematics(req)
+
 	default:
 		c.sendError(req.RequestID, "Unsupported action: "+req.Action)
 	}
+}
+
+func (c *Client) handleEvaluateKinematics(req *ClientEnvelope) {
+	stationID := req.Params.Station
+	if stationID == "" {
+		stationID = "KAPA"
+	}
+	metar, err := c.weatherClient.GetMETAR(nil, stationID)
+	if err != nil {
+		c.sendError(req.RequestID, err.Error())
+		return
+	}
+
+	kReq := kinematics.MissionKinematicsRequest{
+		Airframe:           kinematics.AirframeAirbusH145,
+		StationElevationFt: 5885.0,
+		Weather:            metar,
+		TrueCourseDeg:      270.0,
+		LegDistanceNM:      45.0,
+		FuelWeightKg:       450.0,
+		Payloads: []kinematics.PayloadStationInput{
+			{StationID: kinematics.StationPilotRH, WeightKg: 88.0},
+			{StationID: kinematics.StationCrewAttendantAftLH, WeightKg: 80.0},
+			{StationID: kinematics.StationPrimaryPatientLitter, WeightKg: 92.0},
+		},
+	}
+
+	if kp := req.Params.Kinematics; kp != nil {
+		kReq.Airframe = kinematics.AirframeID(kp.AirframeID)
+		if kp.StationElevationFt > 0 {
+			kReq.StationElevationFt = kp.StationElevationFt
+		}
+		kReq.TrueCourseDeg = kp.TrueCourseDeg
+		if kp.LegDistanceNM > 0 {
+			kReq.LegDistanceNM = kp.LegDistanceNM
+		}
+		if kp.FuelWeightKg > 0 {
+			kReq.FuelWeightKg = kp.FuelWeightKg
+		}
+		if len(kp.Payloads) > 0 {
+			kReq.Payloads = make([]kinematics.PayloadStationInput, len(kp.Payloads))
+			for i, p := range kp.Payloads {
+				kReq.Payloads[i] = kinematics.PayloadStationInput{
+					StationID: kinematics.StationID(p.StationID),
+					WeightKg:  p.WeightKg,
+				}
+			}
+		}
+	}
+
+	eval, err := kinematics.EvaluateMissionKinematics(kReq)
+	if err != nil {
+		c.sendError(req.RequestID, err.Error())
+		return
+	}
+
+	resp := ServerEnvelope{
+		Event:        EventKinematicsEvaluation,
+		RequestID:    req.RequestID,
+		TimestampUTC: time.Now().UTC().Format(time.RFC3339),
+		Seq:          c.hub.NextSeq(),
+		StationID:    stationID,
+		Payload:      eval,
+		Metadata: map[string]string{
+			"engine": "RUST_RFM_FFI",
+		},
+	}
+	c.sendJSON(resp)
 }
 
 func (c *Client) handleEvaluateMinimums(req *ClientEnvelope) {
