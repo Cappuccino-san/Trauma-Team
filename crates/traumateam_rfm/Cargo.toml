@@ -1,0 +1,16 @@
+[package]
+name = "traumateam_rfm"
+version = "0.1.0"
+edition = "2021"
+authors = ["Senior HEMS Operations & Software Architecture"]
+description = "Strict Rust structs with zero-cost abstractions for Rotorcraft Flight Manual (RFM) performance and Mass & Balance under FAA Part 135"
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"], optional = true }
+
+[features]
+default = []
+serde = ["dep:serde"]
+
+[dev-dependencies]
+approx = "0.5"

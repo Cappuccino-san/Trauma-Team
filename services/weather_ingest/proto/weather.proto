@@ -1,0 +1,258 @@
+syntax = "proto3";
+
+package weather;
+
+option go_package = "traumateam/weather_ingest/pkg/pb";
+
+// -----------------------------------------------------------------------------
+// Common Enums
+// -----------------------------------------------------------------------------
+
+enum FlightRuleCategory {
+  CATEGORY_UNSPECIFIED = 0;
+  CATEGORY_VFR = 1;
+  CATEGORY_MVFR = 2;
+  CATEGORY_IFR = 3;
+  CATEGORY_LIFR = 4;
+}
+
+enum HazardType {
+  HAZARD_TYPE_UNSPECIFIED = 0;
+  HAZARD_TYPE_CONVECTIVE_SIGMET = 1;
+  HAZARD_TYPE_SEVERE_TURBULENCE = 2;
+  HAZARD_TYPE_SEVERE_ICING = 3;
+  HAZARD_TYPE_IFR_CLOUD_COVER = 4;
+  HAZARD_TYPE_MOUNTAIN_OBSCURATION = 5;
+  HAZARD_TYPE_VOLCANIC_ASH = 6;
+  HAZARD_TYPE_DUST_SANDSTORM = 7;
+}
+
+enum HazardSeverity {
+  SEVERITY_UNSPECIFIED = 0;
+  SEVERITY_LIGHT = 1;
+  SEVERITY_MODERATE = 2;
+  SEVERITY_SEVERE = 3;
+  SEVERITY_EXTREME = 4;
+}
+
+enum DispatchVerdict {
+  VERDICT_UNSPECIFIED = 0;
+  VERDICT_APPROVED = 1;
+  VERDICT_MARGINAL = 2;
+  VERDICT_BELOW_MINIMUMS = 3;
+  VERDICT_DISQUALIFIED = 4;
+  VERDICT_IFR_REQUIRED = 5;
+}
+
+enum LimitingFactor {
+  LIMITING_FACTOR_NONE = 0;
+  FAR_135_609_CEILING_BELOW_MINIMUMS = 1;
+  FAR_135_609_VISIBILITY_BELOW_MINIMUMS = 2;
+  FAR_135_615_OBSTACLE_CLEARANCE_VIOLATION = 3;
+  FAR_135_209_VFR_RESERVE_VIOLATION = 4;
+  ACTIVE_CONVECTIVE_SIGMET = 5;
+  SEVERE_ICING_HAZARD = 6;
+  SEVERE_TURBULENCE_HAZARD = 7;
+  UNFLYABLE_WIND = 8;
+  IFR_ALTERNATE_MISSING = 9;
+  NO_WEATHER_REPORTING_WITHIN_15NM = 10;
+}
+
+// -----------------------------------------------------------------------------
+// Feed Data Structures
+// -----------------------------------------------------------------------------
+
+message CloudLayer {
+  string coverage = 1; // "FEW", "SCT", "BKN", "OVC", "VV", "CLR", "SKC"
+  double altitude_agl_ft = 2;
+  bool is_ceiling = 3;
+  string modifier = 4; // "CB", "TCU"
+}
+
+message METARMessage {
+  string station_id = 1;
+  string observation_time_utc = 2;
+  double wind_dir_deg = 3;
+  double wind_speed_kts = 4;
+  double wind_gust_kts = 5;
+  bool is_variable_wind = 6;
+  double var_min_deg = 7;
+  double var_max_deg = 8;
+  double visibility_sm = 9;
+  bool visibility_less_than = 10;
+  bool visibility_greater_than = 11;
+  double ceiling_agl_ft = 12;
+  bool has_ceiling = 13;
+  double temperature_c = 14;
+  double dewpoint_c = 15;
+  double altimeter_inhg = 16;
+  FlightRuleCategory flight_category = 17;
+  repeated CloudLayer clouds = 18;
+  repeated string weather_phenomena = 19;
+  double density_altitude_ft = 20;
+  double pressure_altitude_ft = 21;
+  string raw_text = 22;
+}
+
+message TAFFilterPeriod {
+  string change_type = 1; // "BASE", "FM", "TEMPO", "PROB30", "BECMG"
+  string start_time_utc = 2;
+  string end_time_utc = 3;
+  double wind_dir_deg = 4;
+  double wind_speed_kts = 5;
+  double wind_gust_kts = 6;
+  double visibility_sm = 7;
+  double ceiling_agl_ft = 8;
+  repeated CloudLayer clouds = 9;
+  repeated string weather_phenomena = 10;
+}
+
+message TAFMessage {
+  string station_id = 1;
+  string issue_time_utc = 2;
+  string valid_from_utc = 3;
+  string valid_to_utc = 4;
+  repeated TAFFilterPeriod forecast_periods = 5;
+  string raw_text = 6;
+}
+
+message WindsAloftLayer {
+  double altitude_msl_ft = 1;
+  double direction_deg = 2;
+  double speed_kts = 3;
+  double temperature_c = 4;
+}
+
+message WindsAloftMessage {
+  string station_id = 1;
+  string observation_time_utc = 2;
+  repeated WindsAloftLayer layers = 3;
+  string raw_text = 4;
+}
+
+message GeoCoordinate {
+  double latitude = 1;
+  double longitude = 2;
+}
+
+message SIGMETMessage {
+  string advisory_id = 1;
+  HazardType hazard_type = 2;
+  HazardSeverity severity = 3;
+  string valid_from_utc = 4;
+  string valid_to_utc = 5;
+  string summary = 6;
+  double min_altitude_ft = 7;
+  double max_altitude_ft = 8;
+  repeated GeoCoordinate polygon_coordinates = 9;
+  bool active = 10;
+  string raw_text = 11;
+}
+
+// -----------------------------------------------------------------------------
+// FAA Part 135 Subpart L Compliance Messages
+// -----------------------------------------------------------------------------
+
+message EquipmentFlags {
+  bool nvg_equipped = 1;
+  bool htaws_equipped = 2;
+  bool radar_altimeter_equipped = 3;
+  bool autopilot_equipped = 4;
+}
+
+message FlightMinimumsEvaluationRequest {
+  string departure_station = 1;
+  string destination_station = 2;
+  repeated string intermediate_stations = 3;
+  bool is_day = 4;
+  bool is_mountainous = 5;
+  bool is_local = 6;
+  EquipmentFlags equipment = 7;
+  bool allow_opspec_a021_relief = 8;
+  bool is_ifr_certified = 9;
+  bool has_ifr_alternate = 10;
+  bool has_severe_weather_radar = 11;
+  double planned_cruise_alt_msl = 12;
+  double highest_obstacle_along_route_msl = 13;
+}
+
+message StationComplianceReport {
+  string station_id = 1;
+  bool is_compliant = 2;
+  double actual_ceiling_ft = 3;
+  double required_ceiling_ft = 4;
+  double ceiling_margin_ft = 5;
+  double actual_visibility_sm = 6;
+  double required_visibility_sm = 7;
+  double visibility_margin_sm = 8;
+  FlightRuleCategory category = 9;
+  string explanation = 10;
+}
+
+message FlightMinimumsEvaluationResponse {
+  bool is_compliant = 1;
+  DispatchVerdict verdict = 2;
+  LimitingFactor limiting_factor = 3;
+  double worst_ceiling_ft = 4;
+  double worst_visibility_sm = 5;
+  double min_required_ceiling_ft = 6;
+  double min_required_visibility_sm = 7;
+  string legal_rule_applied = 8;
+  string explanation = 9;
+  repeated StationComplianceReport station_reports = 10;
+  repeated SIGMETMessage active_hazards = 11;
+  string evaluation_time_utc = 12;
+  repeated string audit_trace = 13;
+}
+
+// -----------------------------------------------------------------------------
+// gRPC RPC Requests and Stream Responses
+// -----------------------------------------------------------------------------
+
+message StationConditionsRequest {
+  string station_id = 1;
+}
+
+message CurrentConditionsResponse {
+  string station_id = 1;
+  METARMessage metar = 2;
+  TAFMessage taf = 3;
+  WindsAloftMessage winds_aloft = 4;
+  repeated SIGMETMessage hazards = 5;
+}
+
+message StreamWeatherRequest {
+  repeated string stations = 1;
+  int32 refresh_interval_seconds = 2;
+}
+
+message WeatherFeedUpdate {
+  string update_type = 1; // "METAR", "TAF", "WINDS", "SIGMET"
+  string timestamp_utc = 2;
+  string station_id = 3;
+  METARMessage metar = 4;
+  TAFMessage taf = 5;
+  WindsAloftMessage winds_aloft = 6;
+  SIGMETMessage sigmet = 7;
+}
+
+message StreamFlightMinimumsRequest {
+  FlightMinimumsEvaluationRequest parameters = 1;
+  int32 refresh_interval_seconds = 2;
+}
+
+message FlightMinimumsUpdate {
+  string timestamp_utc = 1;
+  FlightMinimumsEvaluationResponse evaluation = 2;
+}
+
+// -----------------------------------------------------------------------------
+// Service Definition
+// -----------------------------------------------------------------------------
+
+service WeatherIngestService {
+  rpc GetCurrentConditions(StationConditionsRequest) returns (CurrentConditionsResponse);
+  rpc StreamWeatherFeeds(StreamWeatherRequest) returns (stream WeatherFeedUpdate);
+  rpc EvaluateFlightMinimums(FlightMinimumsEvaluationRequest) returns (FlightMinimumsEvaluationResponse);
+  rpc StreamFlightMinimums(StreamFlightMinimumsRequest) returns (stream FlightMinimumsUpdate);
+}
