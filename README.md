@@ -17,35 +17,36 @@ Rather than relying on simplified rule-of-thumb weight or static ceiling thresho
 ## Architecture Overview
 
 ```mermaid
+%%{init: {'flowchart': {'htmlLabels': false}}}%%
 graph TD
     %% Data Inputs
     subgraph External["External Feeds & Reference Data"]
-        NOAA["Live NOAA AWC Feeds (METAR/TAF/SIGMET)"]
-        FAA["FAA 14 CFR Part 135 Subpart L Rules"]
-        OEM["Certified OEM RFM Charts (H145 & Bell 429)"]
+        NOAA["NOAA AWC Feeds"]
+        FAA["14 CFR Part 135.L"]
+        OEM["OEM RFM Charts"]
     end
 
     %% Tier 1: Svelte Edge UI
     subgraph UI["Tier 1: Svelte Edge UI (frontend)"]
-        App["App.svelte (Dispatch Dashboard)"]
-        WSRouter["websocket.ts (Demultiplexer)"]
-        WeatherStore["weather.ts (Reactive Env State)"]
-        VerdictStore["verdict.ts (GO/NO-GO State)"]
+        App["App.svelte"]
+        WSRouter["websocket.ts"]
+        WeatherStore["weather.ts"]
+        VerdictStore["verdict.ts"]
         
-        App -->|Outbound ClientEnvelope| WSRouter
-        WSRouter -->|WEATHER_UPDATE Payload| WeatherStore
-        WSRouter -->|MINIMUMS_EVALUATION Payload| VerdictStore
+        App -->|ClientEnvelope| WSRouter
+        WSRouter -->|WEATHER_UPDATE| WeatherStore
+        WSRouter -->|MINIMUMS_EVAL| VerdictStore
         WeatherStore --> App
         VerdictStore --> App
     end
 
     %% Tier 2: Go Telemetry Gateway
-    subgraph Go["Tier 2: Go Telemetry & Compliance Gateway (services/weather_ingest)"]
-        WSHub["WebSocket Broadcast Hub (:8080/ws)"]
-        GRPC["gRPC Server (:50051)"]
-        NOAADecoder["pkg/noaa (Feed Decoders)"]
-        Regs["pkg/regulations (Part 135.L Evaluator)"]
-        CGOBridge["pkg/kinematics/ffi.go (cgo Bridge)"]
+    subgraph Go["Tier 2: Go Gateway (services/weather_ingest)"]
+        WSHub["WS Hub :8080"]
+        GRPC["gRPC :50051"]
+        NOAADecoder["pkg/noaa"]
+        Regs["pkg/regulations"]
+        CGOBridge["pkg/kinematics"]
         
         WSHub <--> GRPC
         GRPC <--> NOAADecoder
@@ -54,18 +55,18 @@ graph TD
     end
 
     %% Tier 3: Rust Physics Core
-    subgraph Rust["Tier 3: Rust Physics & RFM Core (crates/traumateam_rfm)"]
-        FFI["src/ffi.rs (C-ABI)"]
-        Mass["Mass & CG Envelope Solver"]
-        Interp["Zero-Alloc 2D/3D RFM Interpolators"]
+    subgraph Rust["Tier 3: Rust Core (crates/traumateam_rfm)"]
+        FFI["src/ffi.rs"]
+        Mass["Mass & CG Solver"]
+        Interp["2D/3D RFM Grids"]
         
-        subgraph LegIntegrator["Sequential 7-Leg Mission Integrator"]
-            L0["Leg 0: Base Warmup"] --> L1["Leg 1: Outbound Transit"]
-            L1 --> L2["Leg 2: Scene OGE Hover"]
-            L2 --> L3["Leg 3: Hospital Transit"]
-            L3 --> L4["Leg 4: Helipad OEI Cat A"]
-            L4 --> L5["Leg 5: Return Transit"]
-            L5 --> L6["Leg 6: Reserve Check"]
+        subgraph LegIntegrator["7-Leg Mission Integrator"]
+            L0["0. Base Warmup"] --> L1["1. Outbound"]
+            L1 --> L2["2. Scene OGE"]
+            L2 --> L3["3. Hospital"]
+            L3 --> L4["4. Helipad OEI"]
+            L4 --> L5["5. Return"]
+            L5 --> L6["6. Reserves"]
         end
         
         FFI --> Mass
@@ -74,11 +75,11 @@ graph TD
     end
 
     %% Cross-Boundary Connections
-    NOAA -->|TCP/REST| NOAADecoder
-    FAA -->|Static Implementation| Regs
-    OEM -->|Static Tabular Grids| Interp
+    NOAA -->|METAR/TAF/SIGMET| NOAADecoder
+    FAA -->|135.609 & 135.615| Regs
+    OEM -->|H145 & Bell 429| Interp
     
-    WSRouter <-->|JSON WebSockets| WSHub
+    WSRouter <-->|JSON WebSocket| WSHub
     CGOBridge <-->|C-ABI cdylib| FFI
 ```
 
