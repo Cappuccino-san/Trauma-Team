@@ -6,6 +6,14 @@ Rather than relying on simplified rule-of-thumb weight or static ceiling thresho
 
 ---
 
+System Architecture:
+
+Physics & Kinematics Engine (Rust): Computes In-Ground-Effect (IGE) and Out-of-Ground-Effect (OGE) hover ceilings, continuous fuel burn schedules, and shifting Center of Gravity (CG) envelopes with zero-cost abstractions.
+
+Telemetry & Compliance (Go/gRPC): Ingests live NOAA weather feeds (METAR, TAF, SIGMETs) and automatically enforces FAR 135.615 VFR/IFR visibility minimums and mandatory fuel reserves.
+
+Dispatcher Avionics UI (Svelte): A strict-minimalism WebSocket dashboard that pushes real-time, deterministic GO/NO-GO dispatch verdicts and precise limiting factors directly to operators.
+
 ## Architecture Overview
 
 ```mermaid
