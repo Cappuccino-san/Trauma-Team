@@ -17,10 +17,9 @@ Rather than relying on simplified rule-of-thumb weight or static ceiling thresho
 ## Architecture Overview
 
 ```mermaid
-graph LR
+graph TD
     %% Data Inputs
     subgraph External["External Feeds & Reference Data"]
-        direction LR
         NOAA["Live NOAA AWC Feeds (METAR/TAF/SIGMET)"]
         FAA["FAA 14 CFR Part 135 Subpart L Rules"]
         OEM["Certified OEM RFM Charts (H145 & Bell 429)"]
@@ -28,7 +27,6 @@ graph LR
 
     %% Tier 1: Svelte Edge UI
     subgraph UI["Tier 1: Svelte Edge UI (frontend)"]
-        direction LR
         App["App.svelte (Dispatch Dashboard)"]
         WSRouter["websocket.ts (Demultiplexer)"]
         WeatherStore["weather.ts (Reactive Env State)"]
@@ -43,7 +41,6 @@ graph LR
 
     %% Tier 2: Go Telemetry Gateway
     subgraph Go["Tier 2: Go Telemetry & Compliance Gateway (services/weather_ingest)"]
-        direction LR
         WSHub["WebSocket Broadcast Hub (:8080/ws)"]
         GRPC["gRPC Server (:50051)"]
         NOAADecoder["pkg/noaa (Feed Decoders)"]
@@ -58,13 +55,11 @@ graph LR
 
     %% Tier 3: Rust Physics Core
     subgraph Rust["Tier 3: Rust Physics & RFM Core (crates/traumateam_rfm)"]
-        direction LR
         FFI["src/ffi.rs (C-ABI)"]
         Mass["Mass & CG Envelope Solver"]
         Interp["Zero-Alloc 2D/3D RFM Interpolators"]
         
         subgraph LegIntegrator["Sequential 7-Leg Mission Integrator"]
-            direction LR
             L0["Leg 0: Base Warmup"] --> L1["Leg 1: Outbound Transit"]
             L1 --> L2["Leg 2: Scene OGE Hover"]
             L2 --> L3["Leg 3: Hospital Transit"]
