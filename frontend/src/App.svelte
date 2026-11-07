@@ -7,8 +7,11 @@
   import HazardAndTracePanel from './lib/components/HazardAndTracePanel.svelte';
   import RouteMap from './lib/components/RouteMap.svelte';
   import CgEnvelope from './lib/components/CgEnvelope.svelte';
+  import CustomPresetModal from './lib/components/CustomPresetModal.svelte';
   import { wsRouter } from './lib/websocket';
   import { loadSimulationScenario } from './lib/simulation/fixtures';
+
+  let showCustomModal = false;
 
   onMount(() => {
     // Load initial deterministic NOAA AWC & FAA 14 CFR Part 135 Subpart L simulation state
@@ -19,7 +22,8 @@
 </script>
 
 <div class="console-shell">
-  <ConnectionHeader />
+  <ConnectionHeader onOpenCustomPreset={() => (showCustomModal = true)} />
+  <CustomPresetModal isOpen={showCustomModal} onClose={() => (showCustomModal = false)} />
 
   <main class="grid grid-cols-1 lg:grid-cols-12 gap-2.5 p-2.5 flex-1 items-start">
     <!-- Left Column: CorridorControlPanel & CgEnvelope (col-span-3) -->

@@ -10,6 +10,8 @@
   } from '../websocket';
   import { loadSimulationScenario } from '../simulation/fixtures';
 
+  export let onOpenCustomPreset: () => void = () => {};
+
   let customUrl =
     typeof window !== 'undefined'
       ? `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws`
@@ -68,6 +70,14 @@
       </button>
       <button type="button" on:click={() => loadSimulationScenario(wsRouter, 'NEW_ENGLAND_SIGMET')}>
         SIGMET (KBOS-KMHT-KPWM)
+      </button>
+      <button
+        type="button"
+        class="custom-preset-btn"
+        on:click={onOpenCustomPreset}
+        title="Upload custom weather/hazard JSON or build your own simulation preset"
+      >
+        + CUSTOM / UPLOAD DATA
       </button>
     </div>
 
@@ -199,5 +209,16 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  .custom-preset-btn {
+    color: var(--color-go);
+    border-color: var(--color-go);
+    background: var(--color-go-bg);
+  }
+
+  .custom-preset-btn:hover {
+    background: var(--color-go);
+    color: #000;
   }
 </style>
