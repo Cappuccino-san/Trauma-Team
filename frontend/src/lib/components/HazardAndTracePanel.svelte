@@ -1,9 +1,91 @@
 <script lang="ts">
-  import { verdictStore, hazardStore } from '$lib/stores/verdict';
-  import { websocketLogStore } from '$lib/websocket';
+  import { verdictStore, hazardStore, activeCorridor, regulatoryContext } from '$lib/stores/verdict';
+  import { websocketLogStore, wsRouter } from '$lib/websocket';
+  import { loadSimulationScenario } from '$lib/simulation/fixtures';
 
   // Track the active tab state natively
-  let activeTab: 'audit' | 'sigmets' | 'envelopes' = 'audit';
+  let activeTab: 'audit' | 'sigmets' | 'envelopes' | 'console' = 'audit';
+
+  let cmdInput = '';
+  let consoleHistory: { ts: string; type: 'cmd' | 'out' | 'err'; text: string }[] = [
+    {
+      ts: new Date().toISOString().slice(11, 19),
+      type: 'out',
+      text: 'TRAUMATEAM HAA-135.L DISPATCH CONSOLE READY. Type "help" for commands (eval, sub, get, ping, preset, clear).'
+    }
+  ];
+
+  function pushConsole(type: 'cmd' | 'out' | 'err', text: string) {
+    consoleHistory = [
+      ...consoleHistory,
+      { ts: new Date().toISOString().slice(11, 19), type, text }
+    ];
+  }
+
+  function executeConsoleCommand() {
+    const raw = cmdInput.trim();
+    if (!raw) return;
+    pushConsole('cmd', `> ${raw}`);
+    cmdInput = '';
+
+    const parts = raw.split(/\s+/);
+    const cmd = parts[0].toLowerCase();
+
+    if (cmd === 'help') {
+      pushConsole(
+        'out',
+        'Commands: eval [DEP] [INT] [DEST] | get <ICAO> | sub <ICAO...> | preset <go|marginal|nogo|ifr|sigmet> | ping | clear'
+      );
+    } else if (cmd === 'clear') {
+      consoleHistory = [];
+    } else if (cmd === 'ping') {
+      const id = wsRouter.sendPing();
+      pushConsole('out', `Dispatched PING frame (${id})`);
+    } else if (cmd === 'get' && parts[1]) {
+      const st = parts[1].toUpperCase();
+      const id = wsRouter.requestStationConditions(st);
+      pushConsole('out', `Requested METAR/TAF conditions for ${st} (${id})`);
+    } else if (cmd === 'sub' && parts.length > 1) {
+      const sts = parts.slice(1).map((s) => s.toUpperCase());
+      const id = wsRouter.subscribe(sts, ['minimums', 'hazards']);
+      pushConsole('out', `Subscribed to stations [${sts.join(', ')}] (${id})`);
+    } else if (cmd === 'eval') {
+      if (parts.length >= 3) {
+        const dep = parts[1].toUpperCase();
+        const dest = parts[parts.length - 1].toUpperCase();
+        const inters = parts.slice(2, -1).map((s) => s.toUpperCase());
+        activeCorridor.set({ departure: dep, intermediates: inters, destination: dest });
+      }
+      const id = wsRouter.requestMinimumsEvaluation($activeCorridor, $regulatoryContext);
+      pushConsole(
+        'out',
+        `Evaluated corridor ${$activeCorridor.departure} -> ${($activeCorridor.intermediates || []).join(',')} -> ${$activeCorridor.destination} (${id})`
+      );
+    } else if (cmd === 'preset' && parts[1]) {
+      const p = parts[1].toLowerCase();
+      const map: Record<string, any> = {
+        go: 'NOMINAL_GO',
+        marginal: 'MARGINAL_CAUTION',
+        nogo: 'ASPEN_BELOW_MINIMUMS',
+        ifr: 'IFR_TRANSITION_REQUIRED',
+        sigmet: 'NEW_ENGLAND_SIGMET'
+      };
+      if (map[p]) {
+        loadSimulationScenario(wsRouter, map[p]);
+        pushConsole('out', `Loaded simulation scenario: ${map[p]}`);
+      } else {
+        pushConsole('err', `Unknown preset "${p}". Use: go, marginal, nogo, ifr, sigmet`);
+      }
+    } else {
+      try {
+        const parsed = JSON.parse(raw);
+        wsRouter.sendEnvelope(parsed);
+        pushConsole('out', `Sent raw JSON envelope: ${parsed.action || 'CUSTOM'}`);
+      } catch {
+        pushConsole('err', `Unrecognized command "${cmd}". Type "help" for available commands.`);
+      }
+    }
+  }
 </script>
 
 <section class="panel-container flex flex-col" aria-label="Audit Trace and SIGMET Console">
@@ -39,6 +121,15 @@
         on:click={() => (activeTab = 'envelopes')}
       >
         WS Envelopes ({$websocketLogStore?.length || 0})
+      </button>
+      <button
+        type="button"
+        class="px-2.5 py-0.5 font-mono text-[10px] uppercase {activeTab === 'console'
+          ? 'bg-emerald-900/60 text-emerald-300 border-emerald-500'
+          : 'text-emerald-400 border-emerald-800 hover:text-emerald-200'}"
+        on:click={() => (activeTab = 'console')}
+      >
+        CONSOLE
       </button>
     </div>
   </div>
@@ -112,6 +203,35 @@
           Listening for telemetry frames...
         </div>
       {/if}
+    {:else if activeTab === 'console'}
+      <!-- Interactive Dispatch & Telemetry CLI Console -->
+      <div class="flex flex-col h-full justify-between gap-1.5">
+        <div class="flex-1 overflow-y-auto space-y-1 pr-1">
+          {#each consoleHistory as entry}
+            <div
+              class="text-[11px] font-mono {entry.type === 'cmd'
+                ? 'text-cyan-300 font-bold'
+                : entry.type === 'err'
+                  ? 'text-red-400'
+                  : 'text-emerald-300'}"
+            >
+              <span class="text-gray-500 mr-1.5">[{entry.ts}]</span>{entry.text}
+            </div>
+          {/each}
+        </div>
+        <form class="flex gap-1.5 pt-1 border-t border-gray-800" on:submit|preventDefault={executeConsoleCommand}>
+          <span class="text-emerald-400 font-bold self-center text-xs">$</span>
+          <input
+            type="text"
+            bind:value={cmdInput}
+            placeholder="Type command (e.g. eval KBOS KMHT KPWM, get KDEN, preset sigmet, ping, help)..."
+            class="flex-1 bg-black text-white border border-gray-700 px-2 py-1 text-xs font-mono"
+          />
+          <button type="submit" class="px-3 py-1 bg-emerald-950 text-emerald-300 border border-emerald-700 text-[10px]">
+            EXEC
+          </button>
+        </form>
+      </div>
     {/if}
   </div>
 </section>
