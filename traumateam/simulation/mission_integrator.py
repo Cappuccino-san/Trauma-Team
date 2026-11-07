@@ -111,8 +111,8 @@ class MissionSimulationIntegrator:
             # Active payload at start of leg
             active_payloads = self._get_active_payloads(mission.payloads, leg_idx)
             
-            # Mass & Balance snapshot before leg operations
-            mb_start = compute_mass_and_balance(self.airframe, current_fuel_kg, active_payloads)
+            # Mass & Balance snapshot before leg operations (clamped to non-negative physical fuel mass)
+            mb_start = compute_mass_and_balance(self.airframe, max(0.0, current_fuel_kg), active_payloads)
             
             audit_trace.append(
                 f"Start Leg {leg_idx}: GW={mb_start.gross_weight_kg:.1f} kg, Fuel={current_fuel_kg:.1f} kg, "
@@ -219,10 +219,27 @@ class MissionSimulationIntegrator:
             total_distance_nm += leg_dist_nm
             total_flight_time_min += total_leg_duration_min
             total_fuel_burn_kg += leg_burn_kg
-            current_fuel_kg = max(0.0, current_fuel_kg - leg_burn_kg)
+            current_fuel_kg = current_fuel_kg - leg_burn_kg
+            physical_fuel_kg = max(0.0, current_fuel_kg)
 
-            # Mass & Balance snapshot at end of leg
-            mb_end = compute_mass_and_balance(self.airframe, current_fuel_kg, active_payloads)
+            if current_fuel_kg < 0.0:
+                exhaustion_factor = (
+                    LimitingFactor.FAR_135_209_VFR_RESERVE_VIOLATION
+                    if mission.is_vfr
+                    else LimitingFactor.IFR_RESERVE_VIOLATION
+                )
+                exhaustion_msg = (
+                    f"FUEL RESERVE VIOLATION / EXHAUSTION on Leg {leg_idx} ({leg.name}): Fuel required ({leg_burn_kg:.1f} kg) "
+                    f"exceeded available fuel, resulting in a {abs(current_fuel_kg):.1f} kg fuel deficit."
+                )
+                audit_trace.append(exhaustion_msg)
+                if overall_verdict != DispatchVerdict.NO_GO:
+                    overall_verdict = DispatchVerdict.NO_GO
+                    primary_limiting_factor = exhaustion_factor
+                    limiting_description = exhaustion_msg
+
+            # Mass & Balance snapshot at end of leg (clamped to non-negative physical fuel mass)
+            mb_end = compute_mass_and_balance(self.airframe, physical_fuel_kg, active_payloads)
             
             if not mb_end.is_overall_compliant:
                 audit_trace.append(f"MB VIOLATION at end of Leg {leg_idx}: {mb_end.detail_message}")

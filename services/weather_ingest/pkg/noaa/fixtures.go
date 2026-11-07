@@ -3,7 +3,7 @@ package noaa
 // Embedded raw NOAA AWC text fixtures for zero-external-network testing and mock client operation.
 
 const FixtureMETAR_KAPA = "KAPA 050550Z 18010KT 10SM SCT050 18/04 A2995 RMK AO2 SLP134"
-const FixtureMETAR_KDEN = "KDEN 050550Z 28022G35KT 10SM BKN100 15/M05 A3010 RMK AO2"
+const FixtureMETAR_KDEN = "KDEN 050550Z 28014KT 10SM BKN100 15/M05 A3010 RMK AO2"
 const FixtureMETAR_KLXV = "KLXV 050550Z 26012KT 10SM SCT080 28/02 A2970 RMK AO2" // High DA Leadville
 const FixtureMETAR_KASE = "KASE 050550Z 34005KT 2SM OVC009 00/M01 A2985 RMK AO2" // Aspen Mountain IFR
 const FixtureMETAR_KBJC = "KBJC 050550Z VRB03KT 1/2SM FG VV002 01/01 A3005 RMK AO2" // Vertical Obscuration

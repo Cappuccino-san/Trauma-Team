@@ -276,6 +276,12 @@ func (c *Client) handleEvaluateKinematics(req *ClientEnvelope) {
 					WeightKg:  p.WeightKg,
 				}
 			}
+		} else if kReq.Airframe == kinematics.AirframeBell429 {
+			kReq.Payloads = []kinematics.PayloadStationInput{
+				{StationID: kinematics.StationPilotRH, WeightKg: 88.0},
+				{StationID: kinematics.StationCrewAttendantLH, WeightKg: 80.0},
+				{StationID: kinematics.StationPrimaryPatientLitter, WeightKg: 92.0},
+			}
 		}
 	}
 

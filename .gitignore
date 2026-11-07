@@ -60,3 +60,7 @@ frontend/dist/
 .svelte-kit/
 
 
+
+# Multi-agent scratch
+.agents/
+ORIGINAL_REQUEST.md

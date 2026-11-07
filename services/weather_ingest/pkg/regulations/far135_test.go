@@ -96,6 +96,13 @@ func TestFAR135609_CompleteMatrix(t *testing.T) {
 	if r14.MinCeilingFt != 1000.0 || r14.MinVisibilitySM != 3.0 {
 		t.Errorf("expected 1000-3, got %.0f-%.1f", r14.MinCeilingFt, r14.MinVisibilitySM)
 	}
+
+	// 5. Verify AutopilotEquipped qualifies for Night Table 1 Column 2 credit (14 CFR § 135.609)
+	ctxAutopilotNightXC := models.RegulatoryContext{IsDay: false, IsMountainous: true, IsLocalFlyingArea: false, Equipment: models.EquipmentFlags{AutopilotEquipped: true}}
+	r15 := GetFAR135609Minimums(ctxAutopilotNightXC)
+	if r15.MinCeilingFt != 1000.0 || r15.MinVisibilitySM != 3.0 || !r15.EquippedNVGHTAWS {
+		t.Errorf("expected 1000-3 with AutopilotEquipped at Night Mountainous XC, got %.0f-%.1f (equipped=%v)", r15.MinCeilingFt, r15.MinVisibilitySM, r15.EquippedNVGHTAWS)
+	}
 }
 
 func TestCorridorCompliance_ApprovedAndMarginal(t *testing.T) {

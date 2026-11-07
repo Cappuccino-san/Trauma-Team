@@ -6,54 +6,10 @@
     currentCgLat,
     isCgCompliant
   } from '../stores/kinematics';
+  import { wsRouter, connectionState } from '../websocket';
+  import { activeCorridor } from '../stores/verdict';
 
-  // Certified Airbus H145 (BK117 D-2) envelope boundaries:
-  // GW range: 1900 kg to 3700 kg
-  // Long CG range: 3750 mm to 4250 mm
-  // Lat CG range: -100 mm to +100 mm
-  const GW_MIN = 1800;
-  const GW_MAX = 3800;
-  const LONG_MIN = 3700;
-  const LONG_MAX = 4250;
-
-  // ViewBox bounds for SVG canvas
-  const WIDTH = 340;
-  const HEIGHT = 210;
-  const PAD_X = 45;
-  const PAD_Y = 25;
-  const PLOT_W = WIDTH - PAD_X - 15;
-  const PLOT_H = HEIGHT - PAD_Y - 25;
-
-  function scaleX(longMm: number): number {
-    return PAD_X + ((longMm - LONG_MIN) / (LONG_MAX - LONG_MIN)) * PLOT_W;
-  }
-
-  function scaleY(gwKg: number): number {
-    return HEIGHT - PAD_Y - ((gwKg - GW_MIN) / (GW_MAX - GW_MIN)) * PLOT_H;
-  }
-
-  // Certified H145 CG points from OEM tabular charts
-  const CERT_ENVELOPE = [
-    { gw: 2140, fwd: 3770, aft: 4180 },
-    { gw: 2600, fwd: 3780, aft: 4185 },
-    { gw: 3100, fwd: 3810, aft: 4190 },
-    { gw: 3585, fwd: 3855, aft: 4195 },
-    { gw: 3700, fwd: 3880, aft: 4195 }
-  ];
-
-  $: envelopePointsSvg = (() => {
-    // Fwd boundary going up, then Aft boundary going down to form closed polygon
-    const fwdPath = CERT_ENVELOPE.map((p) => `${scaleX(p.fwd).toFixed(1)},${scaleY(p.gw).toFixed(1)}`);
-    const aftPath = [...CERT_ENVELOPE]
-      .reverse()
-      .map((p) => `${scaleX(p.aft).toFixed(1)},${scaleY(p.gw).toFixed(1)}`);
-    return [...fwdPath, ...aftPath].join(' ');
-  })();
-
-  $: curX = scaleX($currentCgLong || 3864);
-  $: curY = scaleY($currentGrossWeight || 2890);
-
-  // Interactive Kinematics & Mass/Balance Sliders (ported from Traumateam Console artifact)
+  // Interactive Kinematics & Mass/Balance Sliders
   let airframe = 'Airbus H145 (BK117 D-2)';
   let fieldElevFt = 5885;
   let oatC = 18.0;
@@ -63,6 +19,72 @@
   let payloadKg = 140;
   let crewKg = 192;
 
+  $: isH145 = airframe.includes('H145');
+  $: gwMin = isH145 ? 1800 : 1700;
+  $: gwMax = isH145 ? 3800 : 3300;
+  $: longMin = isH145 ? 3700 : 3050;
+  $: longMax = isH145 ? 4250 : 3550;
+  $: mtowDisplay = isH145 ? 3700 : 3175;
+  $: gwTicks = isH145 ? [2000, 2500, 3000, 3500] : [1800, 2200, 2600, 3000];
+  $: longTicks = isH145 ? [3800, 3900, 4000, 4100, 4200] : [3100, 3200, 3300, 3400, 3500];
+
+  // ViewBox bounds for SVG canvas
+  const WIDTH = 340;
+  const HEIGHT = 210;
+  const PAD_X = 45;
+  const PAD_Y = 25;
+  const PLOT_W = WIDTH - PAD_X - 15;
+  const PLOT_H = HEIGHT - PAD_Y - 25;
+
+  function scaleX(longMm: number, minMm: number, maxMm: number): number {
+    return PAD_X + ((longMm - minMm) / (maxMm - minMm)) * PLOT_W;
+  }
+
+  function scaleY(gwKg: number, minKg: number, maxKg: number): number {
+    return HEIGHT - PAD_Y - ((gwKg - minKg) / (maxKg - minKg)) * PLOT_H;
+  }
+
+  // Certified OEM H145 (BK117 D-2) and Bell 429 GlobalRanger CG envelopes (matching crates/traumateam_rfm)
+  const H145_ENVELOPE = [
+    { gw: 2000, fwd: 3780, aft: 4200, lat: 85 },
+    { gw: 2800, fwd: 3795, aft: 4190, lat: 80 },
+    { gw: 3400, fwd: 3815, aft: 4170, lat: 78 },
+    { gw: 3700, fwd: 3830, aft: 4150, lat: 75 }
+  ];
+
+  const BELL429_ENVELOPE = [
+    { gw: 1900, fwd: 3120, aft: 3480, lat: 70 },
+    { gw: 2600, fwd: 3140, aft: 3470, lat: 68 },
+    { gw: 3175, fwd: 3170, aft: 3450, lat: 65 }
+  ];
+
+  function interp1d(x: number, xs: number[], ys: number[]): number {
+    if (x <= xs[0]) return ys[0];
+    if (x >= xs[xs.length - 1]) return ys[ys.length - 1];
+    for (let i = 0; i < xs.length - 1; i++) {
+      if (x >= xs[i] && x <= xs[i + 1]) {
+        const t = (x - xs[i]) / (xs[i + 1] - xs[i]);
+        return ys[i] + t * (ys[i + 1] - ys[i]);
+      }
+    }
+    return ys[ys.length - 1];
+  }
+
+  $: activeEnvelope = isH145 ? H145_ENVELOPE : BELL429_ENVELOPE;
+
+  $: envelopePointsSvg = (() => {
+    const fwdPath = activeEnvelope.map(
+      (p) => `${scaleX(p.fwd, longMin, longMax).toFixed(1)},${scaleY(p.gw, gwMin, gwMax).toFixed(1)}`
+    );
+    const aftPath = [...activeEnvelope]
+      .reverse()
+      .map((p) => `${scaleX(p.aft, longMin, longMax).toFixed(1)},${scaleY(p.gw, gwMin, gwMax).toFixed(1)}`);
+    return [...fwdPath, ...aftPath].join(' ');
+  })();
+
+  $: curX = scaleX($currentCgLong || (isH145 ? 3864 : 3260), longMin, longMax);
+  $: curY = scaleY($currentGrossWeight || (isH145 ? 2890 : 2620), gwMin, gwMax);
+
   function recalculateInteractiveKinematics() {
     // 1. Atmospheric State (ICAO Standard Atmosphere)
     const p0 = 29.9213;
@@ -70,41 +92,95 @@
     const isaTempC = 15.0 - 1.98 * (pa / 1000.0);
     const da = pa + 118.8 * (oatC - isaTempC);
 
-    // 2. Mass & CG Envelope (Airbus H145 / Bell 429)
-    const isH145 = airframe.includes('H145');
-    const emptyWeight = isH145 ? 2138.0 : 2045.0;
-    const emptyLongArm = isH145 ? 3910.0 : 3890.0;
-    const emptyLatArm = -5.0;
+    // 2. Mass & CG Envelope (OEM Airbus H145 / Bell 429 matching Rust crates/traumateam_rfm)
+    const h145Selected = airframe.includes('H145');
+    const emptyWeight = h145Selected ? 2140.0 : 2025.0;
+    const emptyLongArm = h145Selected ? 3910.0 : 3260.0;
+    const emptyLatArm = h145Selected ? -5.0 : -3.0;
+    const mtow = h145Selected ? 3700.0 : 3175.0;
+    const minFlightWeight = h145Selected ? 1900.0 : 1800.0;
+
+    // Split crewKg across Pilot RH + Attendant LH, and payloadKg across Primary Litter + Medical Rack
+    const pilotKg = crewKg * 0.48;
+    const attendantKg = crewKg * 0.52;
+    const litterKg = payloadKg * 0.65;
+    const rackKg = payloadKg * 0.35;
+
+    const pilotLongArm = h145Selected ? 2420.0 : 2180.0;
+    const pilotLatArm = h145Selected ? 360.0 : 330.0;
+    const attLongArm = h145Selected ? 3350.0 : 3100.0;
+    const attLatArm = h145Selected ? -420.0 : -400.0;
+    const litterLongArm = h145Selected ? 3820.0 : 3550.0;
+    const litterLatArm = h145Selected ? -280.0 : -250.0;
+    const rackLongArm = h145Selected ? 4280.0 : 3900.0;
+    const rackLatArm = h145Selected ? 380.0 : 350.0;
+
+    const fuelArm = h145Selected
+      ? interp1d(fuelKg, [0, 150, 350, 550, 694], [3900, 3930, 3975, 4005, 4020])
+      : interp1d(fuelKg, [0, 200, 400, 590], [3320, 3340, 3360, 3380]);
 
     const totalGW = emptyWeight + fuelKg + payloadKg + crewKg;
-    const fuelArm = fuelKg <= 200 ? 4010 : 3980;
-    const crewArm = 3620;
-    const payloadArm = 4080;
-
     const longMoment =
       emptyWeight * emptyLongArm +
       fuelKg * fuelArm +
-      crewKg * crewArm +
-      payloadKg * payloadArm;
+      pilotKg * pilotLongArm +
+      attendantKg * attLongArm +
+      litterKg * litterLongArm +
+      rackKg * rackLongArm;
     const longCG = longMoment / totalGW;
 
     const latMoment =
-      emptyWeight * emptyLatArm + fuelKg * 0.0 + crewKg * -12.0 + payloadKg * -20.0;
+      emptyWeight * emptyLatArm +
+      pilotKg * pilotLatArm +
+      attendantKg * attLatArm +
+      litterKg * litterLatArm +
+      rackKg * rackLatArm;
     const latCG = latMoment / totalGW;
 
-    const mtow = isH145 ? 3700 : 3402;
-    const fwdLimit = totalGW <= 2600 ? 3780 : totalGW <= 3100 ? 3810 : 3855;
-    const aftLimit = 4190;
-    const isGwOk = totalGW <= mtow;
+    const envPoints = h145Selected ? H145_ENVELOPE : BELL429_ENVELOPE;
+    const envWeights = envPoints.map((p) => p.gw);
+    const fwdLimit = interp1d(totalGW, envWeights, envPoints.map((p) => p.fwd));
+    const aftLimit = interp1d(totalGW, envWeights, envPoints.map((p) => p.aft));
+    const latLimit = interp1d(totalGW, envWeights, envPoints.map((p) => p.lat));
+    const leftLimit = -latLimit;
+    const rightLimit = latLimit;
+
+    const isGwOk = totalGW >= minFlightWeight && totalGW <= mtow;
     const isLongOk = longCG >= fwdLimit && longCG <= aftLimit;
-    const isLatOk = latCG >= -80 && latCG <= 80;
+    const isLatOk = latCG >= leftLimit && latCG <= rightLimit;
     const isCompliant = isGwOk && isLongOk && isLatOk;
+
+    // 3. Dynamic RFM Cruise TAS, Fuel Flow & ETE (matching h145.rs & bell429.rs 3D cruise formulas)
+    const cruiseTasKts = h145Selected
+      ? 135.0 + (pa / 2000.0) * 1.5 - ((totalGW - 2500.0) / 1200.0) * 5.0 + (oatC - 15.0) * 0.1
+      : 142.0 + (pa / 2000.0) * 1.8 - ((totalGW - 2200.0) / 975.0) * 6.0 + (oatC - 15.0) * 0.1;
+
+    const cruiseFfKgHr = h145Selected
+      ? 210.0 + ((totalGW - 2500.0) / 1200.0) * 45.0 - (pa / 5000.0) * 8.0 + (oatC / 50.0) * 6.0
+      : 195.0 + ((totalGW - 2200.0) / 975.0) * 40.0 - (pa / 5000.0) * 7.0 + (oatC / 50.0) * 5.0;
+
+    const legDistanceNm = 45.0;
+    const groundspeedKts = Math.max(40.0, cruiseTasKts - 8.0);
+    const legEteMinutes = (legDistanceNm / groundspeedKts) * 60.0;
+    const legFuelBurnKg = (legEteMinutes / 60.0) * cruiseFfKgHr;
+    const remainingFuelKg = Math.max(0.0, fuelKg - legFuelBurnKg);
+    const reserve20MinKg = (20.0 / 60.0) * cruiseFfKgHr;
 
     latestKinematics.update((prev) => ({
       ...prev,
       airframe,
+      verdict: isCompliant && remainingFuelKg >= reserve20MinKg ? 'GO' : 'NO-GO',
+      is_feasible: isCompliant && remainingFuelKg >= reserve20MinKg,
       pressure_altitude_ft: pa,
       density_altitude_ft: da,
+      cruise_tas_kts: cruiseTasKts,
+      cruise_fuel_flow_kg_hr: cruiseFfKgHr,
+      groundspeed_kts: groundspeedKts,
+      leg_ete_minutes: legEteMinutes,
+      leg_fuel_burn_kg: legFuelBurnKg,
+      remaining_fuel_kg: remainingFuelKg,
+      reserve_fuel_20min_kg: reserve20MinKg,
+      reserve_margin_kg: remainingFuelKg - reserve20MinKg,
       mass_balance: {
         ...prev.mass_balance,
         is_gw_compliant: isGwOk,
@@ -115,9 +191,45 @@
         cg_long_mm: longCG,
         cg_lat_mm: latCG,
         fwd_limit_mm: fwdLimit,
-        aft_limit_mm: aftLimit
+        aft_limit_mm: aftLimit,
+        left_limit_mm: leftLimit,
+        right_limit_mm: rightLimit,
+        fwd_margin_mm: longCG - fwdLimit,
+        aft_margin_mm: aftLimit - longCG,
+        left_margin_mm: latCG - leftLimit,
+        right_margin_mm: rightLimit - latCG
       }
     }));
+
+    // 4. When connected to live Go/Rust C-FFI gateway, also dispatch EVALUATE_KINEMATICS
+    if ($connectionState === 'CONNECTED') {
+      const airframeId = h145Selected ? 0 : 1;
+      const payloads = h145Selected
+        ? [
+            { station_id: 0, weight_kg: pilotKg },
+            { station_id: 2, weight_kg: attendantKg },
+            { station_id: 6, weight_kg: litterKg },
+            { station_id: 8, weight_kg: rackKg }
+          ]
+        : [
+            { station_id: 0, weight_kg: pilotKg },
+            { station_id: 4, weight_kg: attendantKg },
+            { station_id: 6, weight_kg: litterKg },
+            { station_id: 9, weight_kg: rackKg }
+          ];
+
+      wsRouter.requestKinematicsEvaluation(
+        {
+          airframe_id: airframeId,
+          station_elevation_ft: fieldElevFt,
+          true_course_deg: 270.0,
+          leg_distance_nm: legDistanceNm,
+          fuel_weight_kg: fuelKg,
+          payloads
+        },
+        $activeCorridor.departure || 'KAPA'
+      );
+    }
   }
 </script>
 
@@ -142,7 +254,7 @@
       </div>
       <div class="atm-cell">
         <span class="tel-label">AIRFRAME</span>
-        <select bind:value={airframe} on:change={recalculateInteractiveKinematics} class="airframe-sel">
+        <select bind:value={airframe} on:change={recalculateInteractiveKinematics} class="airframe-sel" aria-label="Airframe Selector">
           <option value="Airbus H145 (BK117 D-2)">H145 (D-2)</option>
           <option value="Bell 429 GlobalRanger">BELL 429</option>
         </select>
@@ -167,14 +279,14 @@
 
     <svg viewBox="0 0 {WIDTH} {HEIGHT}" class="cg-svg">
       <!-- Grid Lines -->
-      {#each [2000, 2500, 3000, 3500] as gw}
-        {@const y = scaleY(gw)}
+      {#each gwTicks as gw}
+        {@const y = scaleY(gw, gwMin, gwMax)}
         <line x1={PAD_X} y1={y} x2={WIDTH - 15} y2={y} stroke="var(--border-hairline)" stroke-width="1" stroke-dasharray="2,2" />
         <text x={PAD_X - 6} y={y + 3} class="axis-tick" text-anchor="end">{gw}</text>
       {/each}
 
-      {#each [3800, 3900, 4000, 4100, 4200] as l}
-        {@const x = scaleX(l)}
+      {#each longTicks as l}
+        {@const x = scaleX(l, longMin, longMax)}
         <line x1={x} y1={HEIGHT - PAD_Y} x2={x} y2={PAD_Y} stroke="var(--border-hairline)" stroke-width="1" stroke-dasharray="2,2" />
         <text x={x} y={HEIGHT - 10} class="axis-tick" text-anchor="middle">{l}</text>
       {/each}
@@ -217,7 +329,7 @@
       <div class="tel-item">
         <span class="tel-label">GROSS WEIGHT</span>
         <span class="tel-val">{$currentGrossWeight.toFixed(0)} KG</span>
-        <span class="tel-sub">MTOW 3700 KG</span>
+        <span class="tel-sub">MTOW {mtowDisplay} KG</span>
       </div>
       <div class="tel-item">
         <span class="tel-label">LONGITUDINAL CG</span>

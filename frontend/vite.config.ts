@@ -6,6 +6,7 @@ import path from 'path';
 export default defineConfig({
   plugins: [svelte(), tailwindcss()],
   resolve: {
+    conditions: ['browser'],
     alias: {
       $lib: path.resolve(__dirname, './src/lib')
     }

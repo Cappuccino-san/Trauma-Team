@@ -321,4 +321,37 @@ func TestGateway_EvaluateKinematicsWebSocketAction(t *testing.T) {
 	if resp.RequestID != "kin-101" {
 		t.Errorf("expected request_id kin-101, got %s", resp.RequestID)
 	}
+
+	// Also verify Bell 429 (AirframeID: 1) with default payloads (BUG-04 regression check)
+	reqBell := ClientEnvelope{
+		Action:    ActionEvaluateKinematics,
+		RequestID: "kin-bell429-default",
+		Params: ClientParams{
+			Station: "KAPA",
+			Kinematics: &KinematicsParams{
+				AirframeID:         1,
+				StationElevationFt: 5885.0,
+				TrueCourseDeg:      180.0,
+				LegDistanceNM:      40.0,
+				FuelWeightKg:       320.0,
+			},
+		},
+	}
+
+	if err := conn.WriteJSON(reqBell); err != nil {
+		t.Fatalf("WriteJSON EVALUATE_KINEMATICS Bell 429 failed: %v", err)
+	}
+
+	conn.SetReadDeadline(time.Now().Add(2 * time.Second))
+	var respBell ServerEnvelope
+	if err := conn.ReadJSON(&respBell); err != nil {
+		t.Fatalf("ReadJSON EVALUATE_KINEMATICS Bell 429 failed: %v", err)
+	}
+
+	if respBell.Event != EventKinematicsEvaluation {
+		t.Errorf("expected KINEMATICS_EVALUATION event for Bell 429, got %s (error: %s)", respBell.Event, respBell.Error)
+	}
+	if respBell.RequestID != "kin-bell429-default" {
+		t.Errorf("expected request_id kin-bell429-default, got %s", respBell.RequestID)
+	}
 }

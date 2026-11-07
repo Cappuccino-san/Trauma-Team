@@ -16,7 +16,7 @@ type WeatherMinimumRule struct {
 
 // GetFAR135609Minimums implements the complete deterministic legal matrix from 14 CFR § 135.609 Table 1.
 func GetFAR135609Minimums(ctx models.RegulatoryContext) WeatherMinimumRule {
-	nvgOrHtaws := ctx.Equipment.NVGEquipped || ctx.Equipment.HTAWSEquipped
+	nvgOrHtaws := ctx.Equipment.NVGEquipped || ctx.Equipment.HTAWSEquipped || ctx.Equipment.AutopilotEquipped
 
 	if !ctx.IsMountainous {
 		if ctx.IsLocalFlyingArea {

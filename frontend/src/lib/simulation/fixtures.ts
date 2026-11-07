@@ -7,6 +7,7 @@ import {
 } from '../types/envelope';
 import type { TraumaTeamWebSocketRouter } from '../websocket';
 import { activeCorridor } from '../stores/verdict';
+import { activeHazards } from '../stores/weather';
 
 /**
  * Deterministic NOAA AWC & FAA 14 CFR Part 135 Subpart L Simulation Fixtures
@@ -41,8 +42,8 @@ export const FIXTURE_METARS: Record<string, METAR> = {
     station_id: 'KDEN',
     observation_time_utc: '2026-11-05T05:50:00Z',
     wind_dir_deg: 280,
-    wind_speed_kts: 22,
-    wind_gust_kts: 35,
+    wind_speed_kts: 14,
+    wind_gust_kts: 0,
     is_variable_wind: false,
     visibility_sm: 10,
     visibility_less_than: false,
@@ -57,7 +58,7 @@ export const FIXTURE_METARS: Record<string, METAR> = {
     flight_category: 'VFR',
     density_altitude_ft: 5910,
     pressure_altitude_ft: 5255,
-    raw_text: 'KDEN 050550Z 28022G35KT 10SM BKN100 15/M05 A3010 RMK AO2'
+    raw_text: 'KDEN 050550Z 28014KT 10SM BKN100 15/M05 A3010 RMK AO2'
   },
   KLXV: {
     station_id: 'KLXV',
@@ -461,11 +462,26 @@ export function loadSimulationScenario(
 ): void {
   const now = new Date().toISOString();
 
+  // Clear stale hazards from previous scenario before loading new scenario
+  activeHazards.set([]);
+
   if (scenarioKey === 'NEW_ENGLAND_SIGMET') {
     activeCorridor.set({
       departure: 'KBOS',
       intermediates: ['KMHT'],
       destination: 'KPWM'
+    });
+  } else if (scenarioKey === 'ASPEN_BELOW_MINIMUMS' || scenarioKey === 'IFR_TRANSITION_REQUIRED') {
+    activeCorridor.set({
+      departure: 'KAPA',
+      intermediates: ['KLXV'],
+      destination: 'KASE'
+    });
+  } else {
+    activeCorridor.set({
+      departure: 'KAPA',
+      intermediates: ['KDEN'],
+      destination: 'KLXV'
     });
   }
 

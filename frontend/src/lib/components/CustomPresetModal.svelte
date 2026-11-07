@@ -8,6 +8,7 @@
     type ComplianceReport
   } from '../types/envelope';
   import { activeCorridor } from '../stores/verdict';
+  import { activeHazards } from '../stores/weather';
 
   export let isOpen = false;
   export let onClose: () => void = () => {};
@@ -158,7 +159,8 @@
       });
     }
 
-    // 3. Ingest hazards if any
+    // 3. Clear previous hazards and ingest new hazards if any
+    activeHazards.set([]);
     if (Array.isArray(data.hazards)) {
       data.hazards.forEach((h: any) => {
         seq += 1;
@@ -328,8 +330,15 @@
 </script>
 
 {#if isOpen}
-  <div class="modal-backdrop" on:click|self={onClose}>
-    <div class="modal-window">
+  <div
+    class="modal-backdrop"
+    role="presentation"
+    on:click|self={onClose}
+    on:keydown={(e) => {
+      if (e.key === 'Escape') onClose();
+    }}
+  >
+    <div class="modal-window" role="dialog" aria-modal="true" aria-label="Custom Simulation Preset Studio">
       <div class="modal-header">
         <div class="flex items-center gap-2">
           <span class="modal-tag">CONFIG // SIM PRESET STUDIO</span>
@@ -396,27 +405,27 @@
           <div class="space-y-3 text-xs">
             <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
               <div>
-                <label class="field-lbl">Preset Name</label>
-                <input type="text" bind:value={customName} class="field-inp" />
+                <label for="preset-name-inp" class="field-lbl">Preset Name</label>
+                <input id="preset-name-inp" type="text" bind:value={customName} class="field-inp" />
               </div>
               <div>
-                <label class="field-lbl">Departure (ICAO)</label>
-                <input type="text" bind:value={depIcao} maxlength="4" class="field-inp uppercase" />
+                <label for="preset-dep-inp" class="field-lbl">Departure (ICAO)</label>
+                <input id="preset-dep-inp" type="text" bind:value={depIcao} maxlength="4" class="field-inp uppercase" />
               </div>
               <div>
-                <label class="field-lbl">Intermediate</label>
-                <input type="text" bind:value={interIcao} maxlength="4" class="field-inp uppercase" />
+                <label for="preset-inter-inp" class="field-lbl">Intermediate</label>
+                <input id="preset-inter-inp" type="text" bind:value={interIcao} maxlength="4" class="field-inp uppercase" />
               </div>
               <div>
-                <label class="field-lbl">Destination (ICAO)</label>
-                <input type="text" bind:value={destIcao} maxlength="4" class="field-inp uppercase" />
+                <label for="preset-dest-inp" class="field-lbl">Destination (ICAO)</label>
+                <input id="preset-dest-inp" type="text" bind:value={destIcao} maxlength="4" class="field-inp uppercase" />
               </div>
             </div>
 
             <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
               <div>
-                <label class="field-lbl">Dispatch Verdict</label>
-                <select bind:value={verdict} class="field-inp">
+                <label for="preset-verdict-sel" class="field-lbl">Dispatch Verdict</label>
+                <select id="preset-verdict-sel" bind:value={verdict} class="field-inp">
                   <option value="APPROVED">APPROVED (GO)</option>
                   <option value="CAUTION">CAUTION (MARGINAL)</option>
                   <option value="BELOW_MINIMUMS">BELOW_MINIMUMS (NO-GO)</option>
@@ -424,8 +433,8 @@
                 </select>
               </div>
               <div>
-                <label class="field-lbl">Limiting Factor</label>
-                <select bind:value={limitingFactor} class="field-inp font-mono text-[10px]">
+                <label for="preset-limit-sel" class="field-lbl">Limiting Factor</label>
+                <select id="preset-limit-sel" bind:value={limitingFactor} class="field-inp font-mono text-[10px]">
                   <option value="LIMITING_FACTOR_NONE">NONE</option>
                   <option value="ACTIVE_CONVECTIVE_SIGMET">ACTIVE_CONVECTIVE_SIGMET</option>
                   <option value="FAR_135_609_CEILING_BELOW_MINIMUMS">CEILING_BELOW_MINS</option>
@@ -434,12 +443,12 @@
                 </select>
               </div>
               <div>
-                <label class="field-lbl">Ceiling (FT AGL): {ceilingFt}</label>
-                <input type="range" min="300" max="25000" step="100" bind:value={ceilingFt} class="w-full accent-cyan-500" />
+                <label for="preset-ceil-rng" class="field-lbl">Ceiling (FT AGL): {ceilingFt}</label>
+                <input id="preset-ceil-rng" type="range" min="300" max="25000" step="100" bind:value={ceilingFt} class="w-full accent-cyan-500" />
               </div>
               <div>
-                <label class="field-lbl">Visibility (SM): {visSm}</label>
-                <input type="range" min="0.5" max="10" step="0.5" bind:value={visSm} class="w-full accent-cyan-500" />
+                <label for="preset-vis-rng" class="field-lbl">Visibility (SM): {visSm}</label>
+                <input id="preset-vis-rng" type="range" min="0.5" max="10" step="0.5" bind:value={visSm} class="w-full accent-cyan-500" />
               </div>
             </div>
 

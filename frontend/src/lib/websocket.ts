@@ -348,14 +348,33 @@ export class TraumaTeamWebSocketRouter {
     corridor: CorridorParams,
     regulatoryContext: RegulatoryContextParams
   ): string {
-    isEvaluating.set(true);
     const requestId = this.nextRequestId('eval');
-    this.sendEnvelope({
+    const sent = this.sendEnvelope({
       action: ClientAction.EVALUATE_MINIMUMS,
       request_id: requestId,
       params: {
         corridor,
         regulatory_context: regulatoryContext
+      }
+    });
+    isEvaluating.set(sent);
+    return requestId;
+  }
+
+  /**
+   * Sends an `EVALUATE_KINEMATICS` action to the Go/Rust C-FFI physics gateway.
+   */
+  public requestKinematicsEvaluation(
+    kinematicsParams: import('./types/envelope').KinematicsParams,
+    stationId = 'KAPA'
+  ): string {
+    const requestId = this.nextRequestId('kin');
+    this.sendEnvelope({
+      action: ClientAction.EVALUATE_KINEMATICS,
+      request_id: requestId,
+      params: {
+        station: stationId.trim().toUpperCase(),
+        kinematics: kinematicsParams
       }
     });
     return requestId;
@@ -446,6 +465,8 @@ export class TraumaTeamWebSocketRouter {
         return `Get ${envelope.params?.station ?? ''}`;
       case ClientAction.EVALUATE_MINIMUMS:
         return `Eval ${envelope.params?.corridor?.departure ?? ''} -> ${envelope.params?.corridor?.destination ?? ''}`;
+      case ClientAction.EVALUATE_KINEMATICS:
+        return `Kinematics airframe=${envelope.params?.kinematics?.airframe_id ?? 0} fuel=${envelope.params?.kinematics?.fuel_weight_kg ?? 0}kg`;
       case ClientAction.PING:
         return `Ping ts=${envelope.timestamp ?? 0}`;
       default:

@@ -282,4 +282,51 @@ describe('TraumaTeam Svelte WebSocket Router & Demultiplexing Stores', () => {
     expect(get(currentCgLat)).toBe(25.5);
     expect(get(isCgCompliant)).toBe(true);
   });
+
+  it('dispatches EVALUATE_KINEMATICS via requestKinematicsEvaluation and guards isEvaluating when disconnected', async () => {
+    const { isEvaluating } = await import('../src/lib/stores/verdict');
+
+    // 1. When disconnected, requestMinimumsEvaluation should NOT leave isEvaluating stuck true
+    router.requestMinimumsEvaluation(defaultCorridor, defaultRegulatoryContext);
+    expect(get(isEvaluating)).toBe(false);
+
+    // 2. When connected, requestMinimumsEvaluation sets isEvaluating=true and requestKinematicsEvaluation sends EVALUATE_KINEMATICS
+    router.connect();
+    mockWs.simulateOpen();
+
+    router.requestMinimumsEvaluation(defaultCorridor, defaultRegulatoryContext);
+    expect(get(isEvaluating)).toBe(true);
+
+    const kinReqId = router.requestKinematicsEvaluation(
+      {
+        airframe_id: 1,
+        station_elevation_ft: 5885,
+        true_course_deg: 270,
+        leg_distance_nm: 45,
+        fuel_weight_kg: 320,
+        payloads: [
+          { station_id: 0, weight_kg: 88 },
+          { station_id: 4, weight_kg: 80 }
+        ]
+      },
+      'KAPA'
+    );
+    const sentKin = JSON.parse(mockWs.sentFrames[mockWs.sentFrames.length - 1]) as ClientEnvelope;
+    expect(sentKin.action).toBe('EVALUATE_KINEMATICS');
+    expect(sentKin.request_id).toBe(kinReqId);
+    expect(sentKin.params?.station).toBe('KAPA');
+    expect(sentKin.params?.kinematics?.airframe_id).toBe(1);
+  });
+
+  it('clears stale activeHazards when switching simulation scenarios from NEW_ENGLAND_SIGMET to NOMINAL_GO', async () => {
+    const { loadSimulationScenario } = await import('../src/lib/simulation/fixtures');
+
+    loadSimulationScenario(router, 'NEW_ENGLAND_SIGMET');
+    expect(get(activeHazardCount)).toBeGreaterThan(0);
+    expect(get(currentVerdictTier)).toBe('NO-GO');
+
+    loadSimulationScenario(router, 'NOMINAL_GO');
+    expect(get(activeHazardCount)).toBe(0);
+    expect(get(currentVerdictTier)).toBe('GO');
+  });
 });

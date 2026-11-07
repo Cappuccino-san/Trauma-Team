@@ -57,7 +57,7 @@ def evaluate_fuel_reserves(
         verdict = DispatchVerdict.CAUTION
         limiting_factor = LimitingFactor.NONE
         msg = (
-            f"CAUTION: Fuel reserves meet FAA statutory 20-min minimum ({actual_reserve_min:.1f} min available, "
+            f"CAUTION: Fuel reserves meet FAA statutory {statutory_min:.0f}-min minimum ({actual_reserve_min:.1f} min available, "
             f"{remaining_fuel_kg:.1f} kg), but fall below company conservative safety buffer of {company_policy_min:.0f} min "
             f"({policy_required_kg:.1f} kg). Refuel prior to departure or plan en-route fuel stop."
         )

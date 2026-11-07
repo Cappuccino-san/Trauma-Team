@@ -29,16 +29,16 @@ def evaluate_terrain_and_obstacles(
 ) -> TerrainClearanceReport:
     """Evaluates en-route terrain and obstacle clearance against 14 CFR § 135.203 and § 135.615."""
     
-    # Highest elevation between origin, destination, and en-route terrain
-    base_max_terrain = max(origin.elevation_ft, destination.elevation_ft)
-    if max_terrain_along_leg_ft is not None:
-        base_max_terrain = max(base_max_terrain, max_terrain_along_leg_ft)
+    # Highest obstacle/terrain elevation (MSL) across origin, destination, and en-route segment
+    origin_obstacle_msl = origin.elevation_ft + origin.obstacle_height_ft
+    dest_obstacle_msl = destination.elevation_ft + destination.obstacle_height_ft
+    enroute_obstacle_msl = (max_terrain_along_leg_ft or 0.0) + (max_obstacle_along_leg_ft or 0.0)
 
-    max_obstacle = max(origin.obstacle_height_ft, destination.obstacle_height_ft)
-    if max_obstacle_along_leg_ft is not None:
-        max_obstacle = max(max_obstacle, max_obstacle_along_leg_ft)
-
-    highest_obstacle_elevation_msl = base_max_terrain + max_obstacle
+    highest_obstacle_elevation_msl = max(
+        origin_obstacle_msl,
+        dest_obstacle_msl,
+        enroute_obstacle_msl,
+    )
 
     # Required clearance under FAR 135.203 / 135.615
     if is_day:

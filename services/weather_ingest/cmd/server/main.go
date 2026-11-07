@@ -71,7 +71,7 @@ func main() {
 	// 4. Background Periodic Feed Poller & Broadcaster
 	stopPeriodic := make(chan struct{})
 	go func() {
-		stations := []string{"KAPA", "KDEN", "KLXV", "KASE"}
+		stations := []string{"KAPA", "KDEN", "KLXV", "KASE", "KBOS", "KPWM", "KMHT", "KPVD"}
 		ticker := time.NewTicker(30 * time.Second)
 		defer ticker.Stop()
 

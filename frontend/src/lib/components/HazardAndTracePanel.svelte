@@ -1,6 +1,6 @@
 <script lang="ts">
   import { verdictStore, hazardStore, activeCorridor, regulatoryContext } from '$lib/stores/verdict';
-  import { websocketLogStore, wsRouter } from '$lib/websocket';
+  import { websocketLogStore, wsRouter, connectionState } from '$lib/websocket';
   import { loadSimulationScenario } from '$lib/simulation/fixtures';
 
   // Track the active tab state natively
@@ -57,6 +57,24 @@
         activeCorridor.set({ departure: dep, intermediates: inters, destination: dest });
       }
       const id = wsRouter.requestMinimumsEvaluation($activeCorridor, $regulatoryContext);
+      if ($connectionState !== 'CONNECTED') {
+        const dep = $activeCorridor.departure.trim().toUpperCase();
+        const dest = $activeCorridor.destination.trim().toUpperCase();
+        const inters = ($activeCorridor.intermediates || []).map((s) => s.trim().toUpperCase());
+        if (dep === 'KBOS' || dest === 'KPWM' || inters.includes('KMHT')) {
+          loadSimulationScenario(wsRouter, 'NEW_ENGLAND_SIGMET');
+        } else if (dest === 'KASE') {
+          if ($regulatoryContext.is_ifr_certified && $regulatoryContext.has_ifr_alternate) {
+            loadSimulationScenario(wsRouter, 'IFR_TRANSITION_REQUIRED');
+          } else {
+            loadSimulationScenario(wsRouter, 'ASPEN_BELOW_MINIMUMS');
+          }
+        } else if (!$regulatoryContext.is_day && $regulatoryContext.equipment.nvg_equipped) {
+          loadSimulationScenario(wsRouter, 'MARGINAL_CAUTION');
+        } else {
+          loadSimulationScenario(wsRouter, 'NOMINAL_GO');
+        }
+      }
       pushConsole(
         'out',
         `Evaluated corridor ${$activeCorridor.departure} -> ${($activeCorridor.intermediates || []).join(',')} -> ${$activeCorridor.destination} (${id})`

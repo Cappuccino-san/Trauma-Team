@@ -47,6 +47,7 @@ class TraumaTeamDispatchEngine:
         is_mountainous: bool = False,
         is_local_flying_area: bool = False,
         nvg_or_htaws_equipped: bool = True,
+        airframe_id: str = "H145",
     ) -> MissionProfile:
         """Helper to construct an authentic standard 7-leg HEMS mission loop:
         Leg 0: Base Startup
@@ -57,14 +58,27 @@ class TraumaTeamDispatchEngine:
         Leg 5: Hospital to Base Return Transit
         Leg 6: Base Shutdown
         """
+        target_spec = self._fleet.get(airframe_id.upper(), self._fleet["H145"])
         payloads: List[PayloadItem] = []
+
+        station_aliases = {
+            "CREW_ATTENDANT_AFT_LH": "CREW_ATTENDANT_LH",
+            "CREW_ATTENDANT_AFT_RH": "CREW_ATTENDANT_RH",
+            "CREW_ATTENDANT_LH": "CREW_ATTENDANT_AFT_LH",
+            "CREW_ATTENDANT_RH": "CREW_ATTENDANT_AFT_RH",
+            "MEDICAL_CABINET_RACK": "MEDICAL_EQUIPMENT_RACK",
+            "MEDICAL_EQUIPMENT_RACK": "MEDICAL_CABINET_RACK",
+            "AFT_AVIONICS_CARGO": "AFT_BAGGAGE",
+            "AFT_BAGGAGE": "AFT_AVIONICS_CARGO",
+        }
 
         # Crew payloads (onboard for entire mission)
         for st_id, w in flight_crew_weights.items():
+            resolved_st = st_id if st_id in target_spec.stations else station_aliases.get(st_id, st_id)
             payloads.append(PayloadItem(
                 item_id=f"CREW_{st_id}",
-                name=f"Crew member at {st_id}",
-                station_id=st_id,
+                name=f"Crew member at {resolved_st}",
+                station_id=resolved_st,
                 weight_kg=w,
                 loaded_at_leg=0,
                 unloaded_at_leg=None,
@@ -74,7 +88,7 @@ class TraumaTeamDispatchEngine:
         payloads.append(PayloadItem(
             item_id="MED_GEAR_PRIMARY",
             name="Modular Medical Equipment Rack",
-            station_id="MEDICAL_CABINET_RACK" if "MEDICAL_CABINET_RACK" in self._fleet["H145"].stations else "MEDICAL_EQUIPMENT_RACK",
+            station_id="MEDICAL_CABINET_RACK" if "MEDICAL_CABINET_RACK" in target_spec.stations else "MEDICAL_EQUIPMENT_RACK",
             weight_kg=medical_gear_weight_kg,
             loaded_at_leg=0,
             unloaded_at_leg=None,
@@ -85,7 +99,7 @@ class TraumaTeamDispatchEngine:
             payloads.append(PayloadItem(
                 item_id="AFT_CARGO_BAGS",
                 name="Aft Clamshell Trauma Bags & Survival Kit",
-                station_id="AFT_AVIONICS_CARGO" if "AFT_AVIONICS_CARGO" in self._fleet["H145"].stations else "AFT_BAGGAGE",
+                station_id="AFT_AVIONICS_CARGO" if "AFT_AVIONICS_CARGO" in target_spec.stations else "AFT_BAGGAGE",
                 weight_kg=aft_cargo_weight_kg,
                 loaded_at_leg=0,
                 unloaded_at_leg=None,
@@ -190,6 +204,29 @@ class TraumaTeamDispatchEngine:
     ) -> DispatchEvaluation:
         """Runs the deterministic mission feasibility engine and generates the complete flight operations verdict."""
         spec = self.get_airframe(airframe_type)
+        station_aliases = {
+            "CREW_ATTENDANT_AFT_LH": "CREW_ATTENDANT_LH",
+            "CREW_ATTENDANT_AFT_RH": "CREW_ATTENDANT_RH",
+            "CREW_ATTENDANT_LH": "CREW_ATTENDANT_AFT_LH",
+            "CREW_ATTENDANT_RH": "CREW_ATTENDANT_AFT_RH",
+            "MEDICAL_CABINET_RACK": "MEDICAL_EQUIPMENT_RACK",
+            "MEDICAL_EQUIPMENT_RACK": "MEDICAL_CABINET_RACK",
+            "AFT_AVIONICS_CARGO": "AFT_BAGGAGE",
+            "AFT_BAGGAGE": "AFT_AVIONICS_CARGO",
+        }
+        needs_remap = any(
+            p.station_id not in spec.stations and station_aliases.get(p.station_id) in spec.stations
+            for p in mission.payloads
+        )
+        if needs_remap:
+            remapped_payloads = [
+                p.model_copy(update={"station_id": station_aliases[p.station_id]})
+                if p.station_id not in spec.stations and station_aliases.get(p.station_id) in spec.stations
+                else p
+                for p in mission.payloads
+            ]
+            mission = mission.model_copy(update={"payloads": remapped_payloads})
+
         integrator = MissionSimulationIntegrator(spec)
         return integrator.execute_mission(
             mission=mission,

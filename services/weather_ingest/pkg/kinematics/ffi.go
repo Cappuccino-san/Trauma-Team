@@ -5,7 +5,7 @@ package kinematics
 /*
 #cgo CFLAGS: -I${SRCDIR}
 #cgo windows LDFLAGS: -L${SRCDIR}/../../../../crates/traumateam_rfm/target/release -ltraumateam_rfm.dll
-#cgo linux LDFLAGS: -L${SRCDIR}/../../../../crates/traumateam_rfm/target/release -ltraumateam_rfm -lm -ldl -lpthread
+#cgo linux LDFLAGS: -L${SRCDIR}/../../../../crates/traumateam_rfm/target/release -Wl,-rpath,${SRCDIR}/../../../../crates/traumateam_rfm/target/release -ltraumateam_rfm -lm -ldl -lpthread
 #cgo darwin LDFLAGS: -L${SRCDIR}/../../../../crates/traumateam_rfm/target/release -ltraumateam_rfm -lm -ldl -lpthread
 #include "traumateam_rfm.h"
 */
