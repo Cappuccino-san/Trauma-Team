@@ -50,6 +50,8 @@ Thumbs.db
 # Binaries
 *.exe
 **/bin/
+services/weather_ingest/gateway-service
+
 
 # Node / Svelte Frontend
 node_modules/

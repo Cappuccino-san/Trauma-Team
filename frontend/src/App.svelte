@@ -20,16 +20,22 @@
 
 <div class="console-shell">
   <ConnectionHeader />
-  <VerdictBanner />
 
-  <main class="workspace-grid">
-    <div class="left-rail">
+  <main class="grid grid-cols-1 lg:grid-cols-12 gap-2.5 p-2.5 flex-1 items-start">
+    <!-- Left Column: CorridorControlPanel & CgEnvelope (col-span-3) -->
+    <div class="col-span-1 lg:col-span-3 col-span-3 lg:row-span-2 flex flex-col gap-2.5">
       <CorridorControlPanel />
       <CgEnvelope />
     </div>
 
-    <div class="right-main">
+    <!-- Top-Right Wide Section: VerdictBanner & RouteMap (col-span-9) -->
+    <div class="col-span-1 lg:col-span-9 col-span-9 flex flex-col gap-2.5">
+      <VerdictBanner />
       <RouteMap />
+    </div>
+
+    <!-- Bottom-Right Section: StationWeatherGrid & HazardAndTracePanel (col-span-9) -->
+    <div class="col-span-1 lg:col-span-9 col-span-9 flex flex-col gap-2.5">
       <StationWeatherGrid />
       <HazardAndTracePanel />
     </div>
@@ -50,28 +56,6 @@
     background: var(--bg-void);
   }
 
-  .workspace-grid {
-    flex: 1;
-    display: grid;
-    grid-template-columns: 330px 1fr;
-    gap: 8px;
-    padding: 8px;
-    align-items: start;
-  }
-
-  .left-rail {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-  }
-
-  .right-main {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    min-width: 0;
-  }
-
   .console-footer {
     display: flex;
     justify-content: space-between;
@@ -83,11 +67,5 @@
     font-size: 9px;
     letter-spacing: 0.08em;
     color: var(--text-muted);
-  }
-
-  @media (max-width: 960px) {
-    .workspace-grid {
-      grid-template-columns: 1fr;
-    }
   }
 </style>

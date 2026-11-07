@@ -10,7 +10,10 @@
   } from '../websocket';
   import { loadSimulationScenario } from '../simulation/fixtures';
 
-  let customUrl = 'ws://localhost:8080/ws';
+  let customUrl =
+    typeof window !== 'undefined'
+      ? `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws`
+      : 'ws://localhost:8080/ws';
 
   function toggleConnection() {
     if ($connectionState === 'CONNECTED' || $connectionState === 'CONNECTING') {
@@ -22,6 +25,10 @@
 
   function triggerPing() {
     wsRouter.sendPing();
+  }
+
+  function dismissError() {
+    lastGatewayError.set(null);
   }
 </script>
 
@@ -59,6 +66,9 @@
       <button type="button" on:click={() => loadSimulationScenario(wsRouter, 'IFR_TRANSITION_REQUIRED')}>
         §135.611 IFR
       </button>
+      <button type="button" on:click={() => loadSimulationScenario(wsRouter, 'NEW_ENGLAND_SIGMET')}>
+        SIGMET (KBOS-KMHT-KPWM)
+      </button>
     </div>
 
     <div class="ws-group">
@@ -76,13 +86,17 @@
       </button>
     </div>
   </div>
+  {#if $lastGatewayError}
+    <button
+      type="button"
+      class="gateway-error-pill"
+      on:click={dismissError}
+      title="Click to dismiss notice"
+    >
+      NOTICE: {$lastGatewayError} ×
+    </button>
+  {/if}
 </header>
-
-{#if $lastGatewayError}
-  <div class="gateway-error-banner" role="alert">
-    <span>GATEWAY TELEMETRY NOTICE: {$lastGatewayError}</span>
-  </div>
-{/if}
 
 <style>
   .telemetry-bar {
@@ -175,11 +189,15 @@
     font-size: 11px;
   }
 
-  .gateway-error-banner {
-    padding: 4px 12px;
+  .gateway-error-pill {
+    padding: 2px 8px;
     background: var(--color-caution-bg);
-    border-bottom: 1px solid var(--color-caution);
+    border: 1px solid var(--color-caution);
     color: var(--color-caution);
-    font-size: 11px;
+    font-size: 10px;
+    max-width: 260px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 </style>

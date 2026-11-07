@@ -118,27 +118,31 @@
   }
 
   onMount(() => {
-    // Zero-token standalone dark Carto style with high contrast
+    // Zero-token standalone dark tactical aeronautical style with high contrast
     const darkStyle: maplibregl.StyleSpecification = {
       version: 8,
       sources: {
-        'carto-dark': {
+        'osm-tactical-dark': {
           type: 'raster',
           tiles: [
-            'https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png',
-            'https://b.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png'
+            'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
           ],
           tileSize: 256,
-          attribution: '&copy; CartoDB &copy; OpenStreetMap'
+          attribution: '&copy; OpenStreetMap contributors'
         }
       },
       layers: [
         {
-          id: 'carto-dark-layer',
+          id: 'osm-tactical-dark-layer',
           type: 'raster',
-          source: 'carto-dark',
+          source: 'osm-tactical-dark',
           minzoom: 0,
-          maxzoom: 19
+          maxzoom: 19,
+          paint: {
+            'raster-brightness-max': 0.32,
+            'raster-contrast': 0.35,
+            'raster-saturation': -0.95
+          }
         }
       ]
     };
@@ -222,15 +226,29 @@
 
   function focusCorridor() {
     if (!map) return;
-    const dep = $activeCorridor.departure.toUpperCase();
-    const dest = $activeCorridor.destination.toUpperCase();
-    const c1 = STATION_COORDS[dep];
-    const c2 = STATION_COORDS[dest];
-    if (c1 && c2) {
-      const bounds = new maplibregl.LngLatBounds(c1, c2);
+    const stList = [
+      $activeCorridor.departure,
+      ...($activeCorridor.intermediates || []),
+      $activeCorridor.destination
+    ]
+      .map((s) => s.trim().toUpperCase())
+      .filter((s) => Boolean(STATION_COORDS[s]));
+
+    if (stList.length >= 2) {
+      const bounds = new maplibregl.LngLatBounds(STATION_COORDS[stList[0]], STATION_COORDS[stList[1]]);
+      stList.forEach((st) => bounds.extend(STATION_COORDS[st]));
       map.fitBounds(bounds, { padding: 45, maxZoom: 8 });
-    } else if (c1) {
-      map.flyTo({ center: c1, zoom: 7.5 });
+    } else if (stList.length === 1) {
+      map.flyTo({ center: STATION_COORDS[stList[0]], zoom: 7.5 });
+    }
+  }
+
+  let lastCorridorKey = '';
+  $: if (map && $activeCorridor) {
+    const key = `${$activeCorridor.departure}-${($activeCorridor.intermediates || []).join(',')}-${$activeCorridor.destination}`;
+    if (key !== lastCorridorKey) {
+      lastCorridorKey = key;
+      focusCorridor();
     }
   }
 </script>
@@ -252,7 +270,7 @@
     border: 1px solid var(--border-hairline);
     display: flex;
     flex-direction: column;
-    min-height: 250px;
+    min-height: 200px;
   }
 
   .map-actions button {
@@ -262,7 +280,7 @@
 
   .map-viewport {
     width: 100%;
-    height: 250px;
+    height: 200px;
     background: #000;
   }
 

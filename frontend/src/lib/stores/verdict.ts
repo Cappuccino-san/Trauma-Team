@@ -1,4 +1,5 @@
 import { writable, derived } from 'svelte/store';
+import { activeHazards } from './weather';
 import type {
   ComplianceReport,
   CorridorParams,
@@ -44,6 +45,29 @@ export const latestComplianceReport = writable<ComplianceReport | null>(null);
 export const evaluationHistory = writable<ComplianceReport[]>([]);
 export const lastEvaluationSeq = writable<number>(0);
 export const isEvaluating = writable<boolean>(false);
+
+// Alias exports for routing components
+export const hazardStore = activeHazards;
+
+export interface VerdictStoreView {
+  latestReport: ComplianceReport | null;
+  evaluationHistory: string[];
+  history: ComplianceReport[];
+  verdict: DispatchVerdict | null;
+  audit_trace: string[];
+}
+
+export const verdictStore = derived(
+  [latestComplianceReport, evaluationHistory],
+  ([$latest, $history]): VerdictStoreView => ({
+    latestReport: $latest,
+    evaluationHistory: $latest?.audit_trace ?? [],
+    history: $history,
+    verdict: $latest?.verdict ?? null,
+    audit_trace: $latest?.audit_trace ?? []
+  })
+);
+
 
 /**
  * Derived normalized high-level verdict status:

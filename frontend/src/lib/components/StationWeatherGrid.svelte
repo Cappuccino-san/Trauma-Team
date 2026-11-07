@@ -176,6 +176,8 @@
 
   .table-wrap {
     overflow-x: auto;
+    max-height: 155px;
+    overflow-y: auto;
   }
 
   .wx-table {

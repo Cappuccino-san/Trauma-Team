@@ -38,6 +38,7 @@ export const rttLatencyMs = writable<number | null>(null);
 export const subscribedTopics = writable<string[]>([]);
 export const lastGatewayError = writable<string | null>(null);
 export const envelopeStreamLog = writable<EnvelopeLogEntry[]>([]);
+export const websocketLogStore = envelopeStreamLog;
 
 export interface WebSocketRouterOptions {
   url?: string;
@@ -158,9 +159,27 @@ export class TraumaTeamWebSocketRouter {
    * can drive the exact same router pipeline.
    */
   public ingestRawFrame(rawJson: string): ServerEnvelope | null {
+    const trimmed = rawJson.trim();
+    if (!trimmed) return null;
+
+    if (trimmed.includes('\n')) {
+      const lines = trimmed.split('\n').map((l) => l.trim()).filter(Boolean);
+      let lastEnvelope: ServerEnvelope | null = null;
+      for (const line of lines) {
+        try {
+          const env = JSON.parse(line) as ServerEnvelope;
+          this.routeEnvelope(env);
+          lastEnvelope = env;
+        } catch {
+          lastGatewayError.set('Malformed JSON frame received from gateway');
+        }
+      }
+      return lastEnvelope;
+    }
+
     let envelope: ServerEnvelope;
     try {
-      envelope = JSON.parse(rawJson) as ServerEnvelope;
+      envelope = JSON.parse(trimmed) as ServerEnvelope;
     } catch {
       lastGatewayError.set('Malformed JSON frame received from gateway');
       return null;

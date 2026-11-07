@@ -6,6 +6,7 @@ import {
   type ComplianceReport
 } from '../types/envelope';
 import type { TraumaTeamWebSocketRouter } from '../websocket';
+import { activeCorridor } from '../stores/verdict';
 
 /**
  * Deterministic NOAA AWC & FAA 14 CFR Part 135 Subpart L Simulation Fixtures
@@ -158,6 +159,25 @@ export const FIXTURE_HAZARDS: WeatherHazard[] = [
     polygon: [],
     active: true,
     raw_text: 'WSUS01 KKCI 050600 DEN WS 050600 SIGMET NOVEMBER 2 VALID UNTIL 051000 CO WY'
+  },
+  {
+    hazard_id: 'SIGE-22E',
+    advisory_id: 'CONVECTIVE SIGMET 22E',
+    hazard_type: 'CONVECTIVE_SIGMET',
+    severity: 'SEVERE',
+    valid_from: '2026-11-05T05:55:00Z',
+    valid_until: '2026-11-05T07:55:00Z',
+    summary: 'LINE SEV TS 25 NM WIDE MOV FROM 24030KT. TOPS ABV FL450. HAIL TO 2 IN...WIND GUSTS TO 60KT POSS.',
+    min_alt_ft: 0,
+    max_alt_ft: 45000,
+    polygon: [
+      { latitude: 43.20, longitude: -71.80 },
+      { latitude: 43.15, longitude: -71.10 },
+      { latitude: 42.70, longitude: -71.15 },
+      { latitude: 42.75, longitude: -71.85 }
+    ],
+    active: true,
+    raw_text: 'WSUS31 KKCI 050555 SIGE CONVECTIVE SIGMET 22E VALID UNTIL 0755Z NH MA ME TOPS ABV FL450'
   }
 ];
 
@@ -366,6 +386,67 @@ export const FIXTURE_SCENARIOS: Record<string, ComplianceReport> = {
       '[RULE] 14 CFR § 135.611 IFR Fallback: IFR_Certified=true, IFR_Alternate=true -> PASS',
       '[VERDICT] IFR_REQUIRED (Authorized under Part 135 Subpart L IFR)'
     ]
+  },
+
+  NEW_ENGLAND_SIGMET: {
+    is_compliant: false,
+    verdict: 'DISQUALIFIED',
+    limiting_factor: 'ACTIVE_CONVECTIVE_SIGMET',
+    worst_ceiling_ft: 4500,
+    worst_visibility_sm: 4.0,
+    min_required_ceiling_ft: 800,
+    min_required_vis_sm: 2.0,
+    ceiling_margin_ft: 3700,
+    vis_margin_sm: 2.0,
+    legal_rule_applied: 'FAA Safety Directive: Active Convective Storm Hazard',
+    explanation: 'DISQUALIFIED: Flight corridor intersects active Convective SIGMET 22E (NH/MA/ME): LINE SEV TS 25 NM WIDE MOV FROM 24030KT. Severe storms blocking KMHT corridor.',
+    station_reports: [
+      {
+        station_id: 'KBOS',
+        is_compliant: true,
+        actual_ceiling_ft: 8000,
+        required_ceiling_ft: 800,
+        ceiling_margin_ft: 7200,
+        actual_vis_sm: 10,
+        required_vis_sm: 2,
+        vis_margin_sm: 8,
+        category: 'VFR',
+        explanation: 'COMPLIANT: Ceiling 8000 ft, Vis 10.0 SM'
+      },
+      {
+        station_id: 'KMHT',
+        is_compliant: false,
+        actual_ceiling_ft: 4500,
+        required_ceiling_ft: 800,
+        ceiling_margin_ft: 3700,
+        actual_vis_sm: 7,
+        required_vis_sm: 2,
+        vis_margin_sm: 5,
+        category: 'VFR',
+        explanation: 'INTERSECTS CONVECTIVE SIGMET 22E: Severe thunderstorms blocking corridor'
+      },
+      {
+        station_id: 'KPWM',
+        is_compliant: false,
+        actual_ceiling_ft: 900,
+        required_ceiling_ft: 800,
+        ceiling_margin_ft: 100,
+        actual_vis_sm: 4,
+        required_vis_sm: 2,
+        vis_margin_sm: 2,
+        category: 'IFR',
+        explanation: 'MARGINAL/IFR: Ceiling 900 ft, Vis 4.0 SM'
+      }
+    ],
+    active_hazards: FIXTURE_HAZARDS,
+    evaluation_time_utc: '2026-11-05T20:17:00Z',
+    audit_trace: [
+      '[ROUTE] KBOS -> KMHT -> KPWM (New England Flight Corridor)',
+      '[CORRIDOR INTERSECTION] Segment KBOS-KMHT intersects Convective SIGMET 22E polygon',
+      '[HAZARD] Active Convective SIGMET 22E: Cloud tops FL450, Hail 2 in, Gusts 60 kt',
+      '[RULE] FAA Part 135 HAA Safety Directive: Flight into active convective SIGMET prohibited',
+      '[VERDICT] DISQUALIFIED (Corridor blocked by severe convective weather)'
+    ]
   }
 };
 
@@ -379,6 +460,14 @@ export function loadSimulationScenario(
   scenarioKey: keyof typeof FIXTURE_SCENARIOS = 'NOMINAL_GO'
 ): void {
   const now = new Date().toISOString();
+
+  if (scenarioKey === 'NEW_ENGLAND_SIGMET') {
+    activeCorridor.set({
+      departure: 'KBOS',
+      intermediates: ['KMHT'],
+      destination: 'KPWM'
+    });
+  }
 
   Object.values(FIXTURE_METARS).forEach((metar) => {
     simSeq += 1;
@@ -396,7 +485,7 @@ export function loadSimulationScenario(
     router.routeEnvelope(env);
   });
 
-  if (scenarioKey === 'ASPEN_BELOW_MINIMUMS') {
+  if (scenarioKey === 'ASPEN_BELOW_MINIMUMS' || scenarioKey === 'NEW_ENGLAND_SIGMET') {
     FIXTURE_HAZARDS.forEach((hazard) => {
       simSeq += 1;
       const hEnv: ServerEnvelope<WeatherHazard> = {

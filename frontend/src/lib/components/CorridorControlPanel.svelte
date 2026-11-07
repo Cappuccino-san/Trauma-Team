@@ -3,7 +3,8 @@
   import { wsRouter, connectionState } from '../websocket';
   import { loadSimulationScenario } from '../simulation/fixtures';
 
-  let intermediatesText = $activeCorridor.intermediates.join(', ');
+  let intermediatesText = '';
+  $: intermediatesText = ($activeCorridor.intermediates || []).join(', ');
 
   function syncIntermediates() {
     $activeCorridor.intermediates = intermediatesText
@@ -18,8 +19,12 @@
 
     // If not connected to live Go backend, evaluate deterministically against local simulation fixtures
     if ($connectionState !== 'CONNECTED') {
+      const dep = $activeCorridor.departure.trim().toUpperCase();
       const dest = $activeCorridor.destination.trim().toUpperCase();
-      if (dest === 'KASE') {
+      const inters = ($activeCorridor.intermediates || []).map((s) => s.trim().toUpperCase());
+      if (dep === 'KBOS' || dest === 'KPWM' || inters.includes('KMHT')) {
+        loadSimulationScenario(wsRouter, 'NEW_ENGLAND_SIGMET');
+      } else if (dest === 'KASE') {
         if ($regulatoryContext.is_ifr_certified && $regulatoryContext.has_ifr_alternate) {
           loadSimulationScenario(wsRouter, 'IFR_TRANSITION_REQUIRED');
         } else {

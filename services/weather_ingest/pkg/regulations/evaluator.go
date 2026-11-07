@@ -19,6 +19,10 @@ var stationCoords = map[string]models.GeoCoordinate{
 	"CYS":  {Latitude: 41.15, Longitude: -104.81},
 	"AKO":  {Latitude: 40.17, Longitude: -103.22},
 	"SNY":  {Latitude: 41.14, Longitude: -102.98},
+	"KBOS": {Latitude: 42.36, Longitude: -71.01},
+	"KMHT": {Latitude: 42.93, Longitude: -71.44},
+	"KPWM": {Latitude: 43.65, Longitude: -70.31},
+	"KPVD": {Latitude: 41.72, Longitude: -71.43},
 }
 
 // PointInPolygon tests if a coordinate is inside a polygon using ray casting.

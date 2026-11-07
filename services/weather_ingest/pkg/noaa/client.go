@@ -74,6 +74,28 @@ func (c *WeatherFeedClient) initDefaultFixtures() {
 	if h2, err := ParseSIGMET(FixtureSIGMET_Turbulence); err == nil {
 		c.hazardsCache = append(c.hazardsCache, h2)
 	}
+
+	// 5. Preload New England Convective SIGMET over KMHT flight corridor
+	hNE := &models.WeatherHazard{
+		HazardID:   "SIGE-22E",
+		AdvisoryID: "CONVECTIVE SIGMET 22E",
+		HazardType: models.HazardTypeConvectiveSIGMET,
+		Severity:   "SEVERE",
+		ValidFrom:  time.Now().UTC(),
+		ValidUntil: time.Now().UTC().Add(4 * time.Hour),
+		Summary:    "LINE SEV TS 25 NM WIDE MOV FROM 24030KT. TOPS ABV FL450. HAIL TO 2 IN...WIND GUSTS TO 60KT POSS.",
+		MinAltFt:   0,
+		MaxAltFt:   45000.0,
+		Polygon: []models.GeoCoordinate{
+			{Latitude: 43.20, Longitude: -71.80},
+			{Latitude: 43.15, Longitude: -71.10},
+			{Latitude: 42.70, Longitude: -71.15},
+			{Latitude: 42.75, Longitude: -71.85},
+		},
+		Active:  true,
+		RawText: "WSUS31 KKCI 050555\nSIGE\nCONVECTIVE SIGMET 22E\nVALID UNTIL 0755Z\nNH MA ME\nLINE SEV TS 25 NM WIDE MOV FROM 24030KT. TOPS ABV FL450.",
+	}
+	c.hazardsCache = append(c.hazardsCache, hNE)
 }
 
 // GetMETAR retrieves the METAR observation for a given station.

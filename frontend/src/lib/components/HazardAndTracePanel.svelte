@@ -1,228 +1,181 @@
 <script lang="ts">
-  import { activeHazards, activeHazardCount } from '../stores/weather';
-  import { latestComplianceReport } from '../stores/verdict';
-  import { envelopeStreamLog } from '../websocket';
+  import { verdictStore, hazardStore } from '$lib/stores/verdict';
+  import { websocketLogStore } from '$lib/websocket';
 
-  type ActiveTab = 'TRACE' | 'HAZARDS' | 'WIRE';
-  let currentTab: ActiveTab = 'TRACE';
+  // Track the active tab state natively
+  let activeTab: 'audit' | 'sigmets' | 'envelopes' = 'audit';
 </script>
 
-<section class="panel-box" aria-label="Audit Trace, SIGMET Advisories, and Envelope Wire Log">
-  <div class="panel-header">
-    <span>03 // DETERMINISTIC AUDIT TRACE & SIGMET STREAM</span>
-    <div class="tab-buttons">
+<section class="panel-container flex flex-col" aria-label="Audit Trace and SIGMET Console">
+  <!-- Tab Navigation Header -->
+  <div class="panel-header-bar">
+    <span class="panel-title">03 // DETERMINISTIC AUDIT TRACE & TELEMETRY CONSOLE</span>
+    <div class="flex space-x-1">
       <button
         type="button"
-        class:active-tab={currentTab === 'TRACE'}
-        on:click={() => (currentTab = 'TRACE')}
+        class="px-2.5 py-0.5 font-mono text-[10px] uppercase {activeTab === 'audit'
+          ? 'bg-gray-700 text-white border-gray-400'
+          : 'text-gray-400 hover:text-gray-200'}"
+        on:click={() => (activeTab = 'audit')}
       >
-        AUDIT TRACE ({$latestComplianceReport?.audit_trace.length ?? 0})
+        Audit Trace ({$verdictStore?.evaluationHistory?.length || 0})
       </button>
       <button
         type="button"
-        class:active-tab={currentTab === 'HAZARDS'}
-        class:hazard-warn={$activeHazardCount > 0}
-        on:click={() => (currentTab = 'HAZARDS')}
+        class="px-2.5 py-0.5 font-mono text-[10px] uppercase {activeTab === 'sigmets'
+          ? 'bg-red-900/60 text-red-300 border-red-500'
+          : ($hazardStore?.length || 0) > 0
+            ? 'text-red-400 border-red-800 hover:text-red-300'
+            : 'text-gray-400 hover:text-gray-200'}"
+        on:click={() => (activeTab = 'sigmets')}
       >
-        SIGMETS ({$activeHazardCount})
+        SIGMETS ({$hazardStore?.length || 0})
       </button>
       <button
         type="button"
-        class:active-tab={currentTab === 'WIRE'}
-        on:click={() => (currentTab = 'WIRE')}
+        class="px-2.5 py-0.5 font-mono text-[10px] uppercase {activeTab === 'envelopes'
+          ? 'bg-gray-700 text-white border-gray-400'
+          : 'text-gray-400 hover:text-gray-200'}"
+        on:click={() => (activeTab = 'envelopes')}
       >
-        WS ENVELOPES ({$envelopeStreamLog.length})
+        WS Envelopes ({$websocketLogStore?.length || 0})
       </button>
     </div>
   </div>
 
-  <div class="panel-content">
-    {#if currentTab === 'TRACE'}
-      <div class="trace-list" data-testid="audit-trace-list">
-        {#if $latestComplianceReport && $latestComplianceReport.audit_trace.length > 0}
-          {#each $latestComplianceReport.audit_trace as line, idx}
-            <div
-              class="trace-line"
-              class:line-fail={line.includes('FAIL') || line.includes('BELOW_MINIMUMS')}
-              class:line-pass={line.includes('PASS') || line.includes('APPROVED')}
-            >
-              <span class="step-idx">{String(idx + 1).padStart(2, '0')}</span>
-              <span class="step-text">{line}</span>
-            </div>
-          {/each}
-        {:else}
-          <div class="empty-msg">NO AUDIT TRACE RECORDED</div>
-        {/if}
-      </div>
-    {:else if currentTab === 'HAZARDS'}
-      <div class="hazard-list">
-        {#if $activeHazards.length > 0}
-          {#each $activeHazards as h (h.hazard_id || h.advisory_id)}
-            <div class="hazard-card">
-              <div class="hazard-top">
-                <span class="haz-id">{h.advisory_id}</span>
-                <span class="haz-sev">{h.hazard_type} // {h.severity}</span>
-                <span class="haz-alt">
-                  FL{Math.round(h.min_alt_ft / 100).toString().padStart(3, '0')} -
-                  FL{Math.round(h.max_alt_ft / 100).toString().padStart(3, '0')}
-                </span>
-              </div>
-              <div class="haz-summary">{h.summary}</div>
-              <code class="haz-raw">{h.raw_text}</code>
-            </div>
-          {/each}
-        {:else}
-          <div class="empty-msg">NO ACTIVE SIGMET OR CONVECTIVE ADVISORIES IN CORRIDOR</div>
-        {/if}
-      </div>
-    {:else}
-      <div class="wire-list">
-        {#each $envelopeStreamLog as item, i (i)}
-          <div class="wire-row">
-            <span class="wire-dir dir-{item.direction}">{item.direction}</span>
-            <span class="wire-seq">{item.seq ? `#${item.seq}` : '--'}</span>
-            <span class="wire-evt">{item.eventOrAction}</span>
-            <span class="wire-sum">{item.summary}</span>
+  <!-- Dynamic Tab Content -->
+  <div class="tab-viewport font-mono text-xs">
+    {#if activeTab === 'audit'}
+      <!-- Render deterministic FAA rule audit trace -->
+      <div class="space-y-1" data-testid="audit-trace-list">
+        {#each $verdictStore?.evaluationHistory || [] as traceItem, idx}
+          <div
+            class="trace-row {traceItem.includes('FAIL') ||
+            traceItem.includes('DISQUALIFIED') ||
+            traceItem.includes('BELOW_MINIMUMS')
+              ? 'trace-fail'
+              : traceItem.includes('PASS') || traceItem.includes('APPROVED')
+                ? 'trace-pass'
+                : ''}"
+          >
+            <span class="trace-idx">{String(idx + 1).padStart(2, '0')}</span>
+            <span class="trace-text">{traceItem}</span>
           </div>
+        {:else}
+          <div class="text-gray-500 py-2">NO AUDIT TRACE RECORDED</div>
         {/each}
       </div>
+    {:else if activeTab === 'sigmets'}
+      <!-- Render active SIGMET advisories -->
+      <div class="space-y-1.5">
+        {#each $hazardStore || [] as hazard}
+          <div class="sigmet-item">
+            <div class="flex justify-between items-center text-[10px] text-red-400 font-bold">
+              <span>{hazard.advisory_id}</span>
+              <span>{hazard.hazard_type} // {hazard.severity}</span>
+              <span>
+                FL{Math.round((hazard.min_alt_ft || 0) / 100)
+                  .toString()
+                  .padStart(3, '0')} - FL{Math.round((hazard.max_alt_ft || 0) / 100)
+                  .toString()
+                  .padStart(3, '0')}
+              </span>
+            </div>
+            <div class="text-gray-200 text-[11px]">{hazard.summary}</div>
+            {#if hazard.raw_text}
+              <code class="text-[10px] text-gray-400 block">{hazard.raw_text}</code>
+            {/if}
+          </div>
+        {:else}
+          <div class="text-gray-500 py-2">NO ACTIVE SIGMET ADVISORIES IN CORRIDOR</div>
+        {/each}
+      </div>
+    {:else if activeTab === 'envelopes'}
+      <!-- Render inbound/outbound WebSocket envelope wire frames -->
+      {#if $websocketLogStore && $websocketLogStore.length > 0}
+        <div class="space-y-0.5">
+          {#each $websocketLogStore as item}
+            <div class="py-1 px-1.5 border-b border-gray-900 flex items-center space-x-2 text-[11px]">
+              <span
+                class="px-1.5 py-0.2 font-bold text-[9px] {item.direction === 'IN'
+                  ? 'text-emerald-400 bg-emerald-950/60 border border-emerald-800'
+                  : 'text-cyan-400 bg-cyan-950/60 border border-cyan-800'}">{item.direction}</span
+              >
+              <span class="text-gray-500 w-10">{item.seq ? `#${item.seq}` : '--'}</span>
+              <span class="text-gray-200 font-bold w-40 truncate">{item.eventOrAction}</span>
+              <span class="text-gray-400 flex-1 truncate">{item.summary}</span>
+            </div>
+          {/each}
+        </div>
+      {:else}
+        <div class="text-gray-400 opacity-70 py-2">
+          Listening for telemetry frames...
+        </div>
+      {/if}
     {/if}
   </div>
 </section>
 
 <style>
-  .panel-box {
-    background: var(--bg-panel);
-    border: 1px solid var(--border-hairline);
+  .panel-container {
+    background: var(--bg-panel, #0c0e12);
+    border: 1px solid var(--border-hairline, #1e232e);
+  }
+
+  .panel-header-bar {
     display: flex;
-    flex-direction: column;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 5px 10px;
+    background: var(--bg-elevated, #12151c);
+    border-bottom: 1px solid var(--border-hairline, #1e232e);
   }
 
-  .tab-buttons {
-    display: flex;
-    gap: 4px;
+  .panel-title {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-secondary, #8c96a8);
   }
 
-  .tab-buttons button {
-    font-size: 9px;
-    padding: 2px 6px;
-  }
-
-  .tab-buttons button.active-tab {
-    background: var(--text-primary);
-    color: var(--bg-void);
-    border-color: var(--text-primary);
-  }
-
-  .tab-buttons button.hazard-warn {
-    border-color: var(--color-nogo);
-    color: var(--color-nogo);
-  }
-
-  .panel-content {
-    padding: 8px 10px;
-    max-height: 250px;
+  .tab-viewport {
+    padding: 6px 10px;
+    height: 155px;
     overflow-y: auto;
   }
 
-  .trace-list,
-  .hazard-list,
-  .wire-list {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-  }
-
-  .trace-line {
+  .trace-row {
     display: flex;
     gap: 8px;
     font-size: 11px;
-    padding: 3px 6px;
-    background: var(--bg-void);
-    border-left: 2px solid var(--border-strong);
+    padding: 2px 6px;
+    background: var(--bg-void, #07080a);
+    border-left: 2px solid var(--border-strong, #2d3545);
   }
 
-  .trace-line.line-pass {
-    border-left-color: var(--color-go);
+  .trace-pass {
+    border-left-color: var(--color-go, #00e676);
   }
 
-  .trace-line.line-fail {
-    border-left-color: var(--color-nogo);
-    color: var(--color-nogo);
+  .trace-fail {
+    border-left-color: var(--color-nogo, #ff1744);
+    color: var(--color-nogo, #ff1744);
   }
 
-  .step-idx {
-    color: var(--text-muted);
+  .trace-idx {
+    color: var(--text-muted, #525b6c);
     font-weight: 700;
   }
 
-  .hazard-card {
-    padding: 6px 8px;
-    background: var(--color-nogo-bg);
-    border: 1px solid var(--color-nogo);
+  .sigmet-item {
+    padding: 5px 8px;
+    background: rgba(255, 23, 68, 0.09);
+    border: 1px solid var(--color-nogo, #ff1744);
     display: flex;
     flex-direction: column;
-    gap: 3px;
-  }
-
-  .hazard-top {
-    display: flex;
-    justify-content: space-between;
-    font-size: 10px;
-    font-weight: 800;
-    color: var(--color-nogo);
-  }
-
-  .haz-summary {
-    font-size: 11px;
-    color: var(--text-primary);
-  }
-
-  .haz-raw {
-    font-size: 10px;
-    color: var(--text-secondary);
-  }
-
-  .wire-row {
-    display: grid;
-    grid-template-columns: 36px 48px 155px 1fr;
-    gap: 8px;
-    font-size: 10px;
-    padding: 2px 4px;
-    border-bottom: 1px solid var(--border-hairline);
-  }
-
-  .wire-dir {
-    font-weight: 800;
-  }
-
-  .dir-IN {
-    color: var(--color-go);
-  }
-
-  .dir-OUT {
-    color: var(--color-mvfr);
-  }
-
-  .wire-seq {
-    color: var(--text-muted);
-  }
-
-  .wire-evt {
-    font-weight: 700;
-    color: var(--text-primary);
-  }
-
-  .wire-sum {
-    color: var(--text-secondary);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .empty-msg {
-    color: var(--text-muted);
-    font-size: 11px;
-    padding: 8px 0;
+    gap: 2px;
   }
 </style>
