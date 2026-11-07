@@ -224,6 +224,18 @@
     }
   });
 
+  let isExpanded = false;
+
+  function toggleExpand() {
+    isExpanded = !isExpanded;
+    setTimeout(() => {
+      if (map) {
+        map.resize();
+        focusCorridor();
+      }
+    }, 50);
+  }
+
   function focusCorridor() {
     if (!map) return;
     const stList = [
@@ -237,7 +249,7 @@
     if (stList.length >= 2) {
       const bounds = new maplibregl.LngLatBounds(STATION_COORDS[stList[0]], STATION_COORDS[stList[1]]);
       stList.forEach((st) => bounds.extend(STATION_COORDS[st]));
-      map.fitBounds(bounds, { padding: 45, maxZoom: 8 });
+      map.fitBounds(bounds, { padding: 60, maxZoom: 8.5 });
     } else if (stList.length === 1) {
       map.flyTo({ center: STATION_COORDS[stList[0]], zoom: 7.5 });
     }
@@ -251,17 +263,155 @@
       focusCorridor();
     }
   }
+
+  onMount(() => {
+    // Zero-token standalone dark tactical aeronautical style with high contrast
+    const darkStyle: maplibregl.StyleSpecification = {
+      version: 8,
+      sources: {
+        'osm-tactical-dark': {
+          type: 'raster',
+          tiles: [
+            'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
+          ],
+          tileSize: 256,
+          attribution: '&copy; OpenStreetMap contributors'
+        }
+      },
+      layers: [
+        {
+          id: 'osm-tactical-dark-layer',
+          type: 'raster',
+          source: 'osm-tactical-dark',
+          minzoom: 0,
+          maxzoom: 19,
+          paint: {
+            'raster-brightness-max': 0.32,
+            'raster-contrast': 0.35,
+            'raster-saturation': -0.95
+          }
+        }
+      ]
+    };
+
+    map = new maplibregl.Map({
+      container: mapContainer,
+      style: darkStyle,
+      center: [-105.5, 39.5], // Centered along Denver/Rockies
+      zoom: 6.2,
+      attributionControl: false
+    });
+
+    map.addControl(new maplibregl.NavigationControl({ showCompass: true, showZoom: true }), 'top-right');
+
+    map.on('load', () => {
+      // 1. Add Hazard Polygons Source & Layers
+      map?.addSource('hazards', {
+        type: 'geojson',
+        data: buildGeoJsonFromHazards($activeHazards)
+      });
+
+      map?.addLayer({
+        id: 'hazards-fill',
+        type: 'fill',
+        source: 'hazards',
+        paint: {
+          'fill-color': '#ff1744',
+          'fill-opacity': 0.28
+        }
+      });
+
+      map?.addLayer({
+        id: 'hazards-line',
+        type: 'line',
+        source: 'hazards',
+        paint: {
+          'line-color': '#ff1744',
+          'line-width': 2.5,
+          'line-dasharray': [2, 2]
+        }
+      });
+
+      // 2. Add Route Corridor Source & Layers
+      map?.addSource('route', {
+        type: 'geojson',
+        data: buildRouteGeoJson($activeCorridor)
+      });
+
+      map?.addLayer({
+        id: 'route-line',
+        type: 'line',
+        source: 'route',
+        filter: ['==', '$type', 'LineString'],
+        paint: {
+          'line-color': '#00e676',
+          'line-width': 3
+        }
+      });
+
+      map?.addLayer({
+        id: 'route-points',
+        type: 'circle',
+        source: 'route',
+        filter: ['==', '$type', 'Point'],
+        paint: {
+          'circle-radius': 6,
+          'circle-color': '#07080a',
+          'circle-stroke-width': 2.5,
+          'circle-stroke-color': '#00e676'
+        }
+      });
+
+      updateLayers();
+      setTimeout(focusCorridor, 200);
+    });
+  });
+
+  onDestroy(() => {
+    if (map) {
+      map.remove();
+      map = null;
+    }
+  });
 </script>
 
-<div class="map-card" aria-label="Aeronautical Route & SIGMET Overlay Map">
+<div class="map-card" class:expanded={isExpanded} aria-label="Aeronautical Route & SIGMET Overlay Map">
   <div class="panel-header">
-    <span>03 // AERONAUTICAL CORRIDOR & HAZARD GEODESIC (MAPLIBRE)</span>
+    <div class="flex items-center gap-2">
+      <span>03 // AERONAUTICAL CORRIDOR &amp; HAZARD GEODESIC (MAPLIBRE)</span>
+      <span class="corridor-summary">
+        {$activeCorridor.departure || 'DEP'} → {($activeCorridor.intermediates || []).join(' → ') || 'INT'} → {$activeCorridor.destination || 'DEST'}
+      </span>
+    </div>
     <div class="map-actions">
-      <button type="button" on:click={focusCorridor}>CENTER ROUTE</button>
+      <button type="button" class="btn-action" on:click={focusCorridor}>CENTER ROUTE</button>
+      <button type="button" class="btn-action btn-expand" on:click={toggleExpand}>
+        {isExpanded ? 'STANDARD VIEW (480PX)' : 'EXPAND VIEW (680PX)'}
+      </button>
     </div>
   </div>
 
-  <div class="map-viewport" bind:this={mapContainer}></div>
+  <div class="map-container-relative">
+    <div class="map-viewport" class:viewport-expanded={isExpanded} bind:this={mapContainer}></div>
+
+    <!-- Live Telemetry HUD Strip Overlaid on Map -->
+    <div class="map-hud-overlay">
+      <div class="hud-item">
+        <span class="hud-label">CORRIDOR</span>
+        <span class="hud-val text-cyan-400">{$activeCorridor.departure} → {$activeCorridor.destination}</span>
+      </div>
+      <div class="hud-item">
+        <span class="hud-label">ACTIVE HAZARDS</span>
+        <span class="hud-val" class:text-rose-400={$activeHazards.length > 0} class:text-emerald-400={$activeHazards.length === 0}>
+          {$activeHazards.length} {$activeHazards.length === 1 ? 'SIGMET' : 'SIGMETS'}
+        </span>
+      </div>
+      <div class="hud-item">
+        <span class="hud-label">AIRSPACE STATUS</span>
+        <span class="hud-val text-emerald-400">CLASS G/E COMPLIANT</span>
+      </div>
+    </div>
+  </div>
 </div>
 
 <style>
@@ -270,21 +420,105 @@
     border: 1px solid var(--border-hairline);
     display: flex;
     flex-direction: column;
-    min-height: 200px;
+    transition: all 0.2s ease-in-out;
   }
 
-  .map-actions button {
+  .corridor-summary {
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--color-go);
+    letter-spacing: 0.05em;
+    background: rgba(0, 230, 118, 0.1);
+    padding: 1px 6px;
+    border: 1px solid rgba(0, 230, 118, 0.3);
+  }
+
+  .map-actions {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+  }
+
+  .btn-action {
     font-size: 9px;
-    padding: 2px 6px;
+    padding: 2px 7px;
+    font-weight: 700;
+  }
+
+  .btn-expand {
+    border-color: var(--color-info);
+    color: var(--color-info);
+  }
+
+  .btn-expand:hover {
+    background: var(--color-info);
+    color: var(--bg-void);
+  }
+
+  .map-container-relative {
+    position: relative;
+    width: 100%;
   }
 
   .map-viewport {
     width: 100%;
-    height: 200px;
+    height: 480px;
+    min-height: 480px;
     background: #000;
+    transition: height 0.2s ease-in-out;
+  }
+
+  .viewport-expanded {
+    height: 680px;
+    min-height: 680px;
+  }
+
+  .map-hud-overlay {
+    position: absolute;
+    bottom: 12px;
+    left: 12px;
+    display: flex;
+    gap: 8px;
+    background: rgba(7, 8, 10, 0.88);
+    border: 1px solid var(--border-strong);
+    padding: 4px 8px;
+    backdrop-filter: blur(4px);
+    z-index: 10;
+    pointer-events: none;
+  }
+
+  .hud-item {
+    display: flex;
+    flex-direction: column;
+    padding: 0 4px;
+  }
+
+  .hud-label {
+    font-size: 8px;
+    color: var(--text-muted);
+    letter-spacing: 0.06em;
+  }
+
+  .hud-val {
+    font-size: 10px;
+    font-weight: 800;
+    font-family: var(--font-mono);
   }
 
   :global(.maplibregl-canvas) {
     outline: none;
+  }
+
+  :global(.maplibregl-ctrl-group) {
+    background: #0c0e12 !important;
+    border: 1px solid #2d3545 !important;
+  }
+
+  :global(.maplibregl-ctrl-group button) {
+    border-bottom: 1px solid #1e232e !important;
+  }
+
+  :global(.maplibregl-ctrl-icon) {
+    filter: invert(1);
   }
 </style>

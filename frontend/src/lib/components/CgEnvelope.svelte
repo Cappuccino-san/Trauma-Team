@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
   import {
     latestKinematics,
     currentGrossWeight,
@@ -84,6 +85,9 @@
 
   $: curX = scaleX($currentCgLong || (isH145 ? 3864 : 3260), longMin, longMax);
   $: curY = scaleY($currentGrossWeight || (isH145 ? 2890 : 2620), gwMin, gwMax);
+  $: fwdLimitDisplay = $latestKinematics.mass_balance.fwd_limit_mm || (isH145 ? 3780 : 3120);
+  $: aftLimitDisplay = $latestKinematics.mass_balance.aft_limit_mm || (isH145 ? 4200 : 3480);
+  $: cgProgressPct = Math.max(0, Math.min(100, (($currentCgLong - fwdLimitDisplay) / (aftLimitDisplay - fwdLimitDisplay || 1)) * 100));
 
   function recalculateInteractiveKinematics() {
     // 1. Atmospheric State (ICAO Standard Atmosphere)
@@ -231,13 +235,20 @@
       );
     }
   }
+
+  onMount(() => {
+    recalculateInteractiveKinematics();
+  });
 </script>
 
 <div class="cg-card" aria-label="Center of Gravity Envelope Visualizer">
   <div class="panel-header">
-    <span>02 // ATMOSPHERE, MASS & CG ENVELOPE (OEM AIRBUS H145 / BELL 429)</span>
+    <div class="flex items-center gap-2">
+      <span>02 // ATMOSPHERE, MASS &amp; CG ENVELOPE (OEM AIRBUS H145 / BELL 429)</span>
+      <span class="airframe-badge">{isH145 ? 'AIRBUS H145' : 'BELL 429'}</span>
+    </div>
     <span class="cg-status" class:compliant={$isCgCompliant} class:violation={!$isCgCompliant}>
-      {$isCgCompliant ? 'COMPLIANT' : 'EXCEEDED'}
+      {$isCgCompliant ? 'COMPLIANT (IN LIMITS)' : 'EXCEEDED (NO-GO)'}
     </span>
   </div>
 
@@ -253,7 +264,7 @@
         <span class="tel-val text-amber-400">{Math.round($latestKinematics.density_altitude_ft).toLocaleString()} FT</span>
       </div>
       <div class="atm-cell">
-        <span class="tel-label">AIRFRAME</span>
+        <span class="tel-label">AIRFRAME SELECT</span>
         <select bind:value={airframe} on:change={recalculateInteractiveKinematics} class="airframe-sel" aria-label="Airframe Selector">
           <option value="Airbus H145 (BK117 D-2)">H145 (D-2)</option>
           <option value="Bell 429 GlobalRanger">BELL 429</option>
@@ -261,13 +272,13 @@
       </div>
     </div>
 
-    <!-- Interactive Atmospheric Sliders -->
+    <!-- Interactive Atmospheric Sliders with Live Value Tracking -->
     <div class="sliders-box">
       <div class="slider-row">
         <div class="slider-lbl">
-          <span>Elev: <strong>{fieldElevFt.toLocaleString()} ft</strong></span>
-          <span>OAT: <strong>{oatC.toFixed(0)}°C</strong></span>
-          <span>QNH: <strong>{qnhInHg.toFixed(2)}"</strong></span>
+          <span>Field Elev: <strong class="text-cyan-400">{fieldElevFt.toLocaleString()} ft</strong></span>
+          <span>OAT: <strong class="text-amber-400">{oatC.toFixed(0)}°C</strong></span>
+          <span>Altimeter: <strong class="text-cyan-400">{qnhInHg.toFixed(2)}"</strong></span>
         </div>
         <div class="slider-grid-3">
           <input type="range" min="0" max="14000" step="50" bind:value={fieldElevFt} on:input={recalculateInteractiveKinematics} title="Field Elevation (ft)" />
@@ -277,45 +288,94 @@
       </div>
     </div>
 
-    <svg viewBox="0 0 {WIDTH} {HEIGHT}" class="cg-svg">
-      <!-- Grid Lines -->
-      {#each gwTicks as gw}
-        {@const y = scaleY(gw, gwMin, gwMax)}
-        <line x1={PAD_X} y1={y} x2={WIDTH - 15} y2={y} stroke="var(--border-hairline)" stroke-width="1" stroke-dasharray="2,2" />
-        <text x={PAD_X - 6} y={y + 3} class="axis-tick" text-anchor="end">{gw}</text>
-      {/each}
+    <!-- 2D OEM CG Envelope SVG Canvas -->
+    <div class="svg-container-box">
+      <svg viewBox="0 0 {WIDTH} {HEIGHT}" class="cg-svg">
+        <!-- Grid Lines -->
+        {#each gwTicks as gw}
+          {@const y = scaleY(gw, gwMin, gwMax)}
+          <line x1={PAD_X} y1={y} x2={WIDTH - 15} y2={y} stroke="var(--border-hairline)" stroke-width="1" stroke-dasharray="2,2" />
+          <text x={PAD_X - 6} y={y + 3} class="axis-tick" text-anchor="end">{gw}</text>
+        {/each}
 
-      {#each longTicks as l}
-        {@const x = scaleX(l, longMin, longMax)}
-        <line x1={x} y1={HEIGHT - PAD_Y} x2={x} y2={PAD_Y} stroke="var(--border-hairline)" stroke-width="1" stroke-dasharray="2,2" />
-        <text x={x} y={HEIGHT - 10} class="axis-tick" text-anchor="middle">{l}</text>
-      {/each}
+        {#each longTicks as l}
+          {@const x = scaleX(l, longMin, longMax)}
+          <line x1={x} y1={HEIGHT - PAD_Y} x2={x} y2={PAD_Y} stroke="var(--border-hairline)" stroke-width="1" stroke-dasharray="2,2" />
+          <text x={x} y={HEIGHT - 10} class="axis-tick" text-anchor="middle">{l}</text>
+        {/each}
 
-      <!-- Axis Labels -->
-      <text x={WIDTH / 2} y={HEIGHT - 0} class="axis-title" text-anchor="middle">LONGITUDINAL CG (MM)</text>
-      <text x={12} y={HEIGHT / 2} class="axis-title" text-anchor="middle" transform="rotate(-90 12 {HEIGHT / 2})">GW (KG)</text>
+        <!-- Axis Labels -->
+        <text x={WIDTH / 2} y={HEIGHT - 0} class="axis-title" text-anchor="middle">LONGITUDINAL CG (MM)</text>
+        <text x={12} y={HEIGHT / 2} class="axis-title" text-anchor="middle" transform="rotate(-90 12 {HEIGHT / 2})">GW (KG)</text>
 
-      <!-- Certified Boundary Polygon -->
-      <polygon
-        points={envelopePointsSvg}
-        fill="rgba(0, 230, 118, 0.08)"
-        stroke="var(--color-go)"
-        stroke-width="1.5"
-      />
+        <!-- Certified Boundary Polygon -->
+        <polygon
+          points={envelopePointsSvg}
+          fill={$isCgCompliant ? 'rgba(0, 230, 118, 0.09)' : 'rgba(255, 23, 68, 0.08)'}
+          stroke={$isCgCompliant ? 'var(--color-go)' : 'var(--color-nogo)'}
+          stroke-width="1.8"
+        />
 
-      <!-- Current Operating Point Crosshair -->
-      <line x1={curX - 8} y1={curY} x2={curX + 8} y2={curY} stroke={$isCgCompliant ? 'var(--color-go)' : 'var(--color-nogo)'} stroke-width="2" />
-      <line x1={curX} y1={curY - 8} x2={curX} y2={curY + 8} stroke={$isCgCompliant ? 'var(--color-go)' : 'var(--color-nogo)'} stroke-width="2" />
-      <circle cx={curX} cy={curY} r="4" fill="none" stroke={$isCgCompliant ? 'var(--color-go)' : 'var(--color-nogo)'} stroke-width="1.5" />
-    </svg>
+        <!-- Operating Point Crosshair & Reticle -->
+        <line x1={curX - 10} y1={curY} x2={curX + 10} y2={curY} stroke={$isCgCompliant ? 'var(--color-go)' : 'var(--color-nogo)'} stroke-width="2" />
+        <line x1={curX} y1={curY - 10} x2={curX} y2={curY + 10} stroke={$isCgCompliant ? 'var(--color-go)' : 'var(--color-nogo)'} stroke-width="2" />
+        <circle cx={curX} cy={curY} r="5" fill="none" stroke={$isCgCompliant ? 'var(--color-go)' : 'var(--color-nogo)'} stroke-width="2" />
+        <circle cx={curX} cy={curY} r="10" fill="none" stroke={$isCgCompliant ? 'rgba(0, 230, 118, 0.35)' : 'rgba(255, 23, 68, 0.4)'} stroke-width="1" stroke-dasharray="2,2" />
 
-    <!-- Interactive Fuel, Payload & Crew Sliders -->
+        <!-- Live Coordinate Tag in SVG -->
+        <text
+          x={Math.min(WIDTH - 90, Math.max(PAD_X + 4, curX + 8))}
+          y={Math.max(PAD_Y + 14, curY - 6)}
+          class="axis-tick font-bold"
+          fill={$isCgCompliant ? '#00e676' : '#ff1744'}
+        >
+          {Math.round($currentGrossWeight)}kg / {Math.round($currentCgLong)}mm
+        </text>
+      </svg>
+    </div>
+
+    <!-- Live Graphical Margin Meters -->
+    <div class="meters-row">
+      <!-- Gross Weight / MTOW Meter -->
+      <div class="meter-box">
+        <div class="meter-header">
+          <span>MTOW CAPACITY</span>
+          <span class="meter-stat" class:text-rose-400={$currentGrossWeight > mtowDisplay} class:text-emerald-400={$currentGrossWeight <= mtowDisplay}>
+            {Math.round(($currentGrossWeight / mtowDisplay) * 100)}% ({Math.round(mtowDisplay - $currentGrossWeight)} kg margin)
+          </span>
+        </div>
+        <div class="meter-track">
+          <div
+            class="meter-fill"
+            class:fill-go={$currentGrossWeight <= mtowDisplay * 0.92}
+            class:fill-warn={$currentGrossWeight > mtowDisplay * 0.92 && $currentGrossWeight <= mtowDisplay}
+            class:fill-danger={$currentGrossWeight > mtowDisplay}
+            style="width: {Math.min(100, ($currentGrossWeight / mtowDisplay) * 100)}%"
+          ></div>
+        </div>
+      </div>
+
+      <!-- CG Longitudinal Balance Meter -->
+      <div class="meter-box">
+        <div class="meter-header">
+          <span>LONG CG POSITION</span>
+          <span class="meter-stat">
+            FWD: +{Math.round($latestKinematics.mass_balance.fwd_margin_mm)} mm / AFT: +{Math.round($latestKinematics.mass_balance.aft_margin_mm)} mm
+          </span>
+        </div>
+        <div class="meter-track">
+          <div class="cg-marker-indicator" style="left: {cgProgressPct}%"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Interactive Fuel, Payload & Crew Sliders with Live Feedback -->
     <div class="sliders-box">
       <div class="slider-row">
         <div class="slider-lbl">
-          <span>Fuel: <strong>{fuelKg}kg</strong></span>
-          <span>Payload: <strong>{payloadKg}kg</strong></span>
-          <span>Crew: <strong>{crewKg}kg</strong></span>
+          <span>Fuel: <strong class="text-cyan-400">{fuelKg} kg</strong> ({Math.round(fuelKg / 0.8)} L)</span>
+          <span>Payload: <strong class="text-cyan-400">{payloadKg} kg</strong></span>
+          <span>Crew: <strong class="text-cyan-400">{crewKg} kg</strong></span>
         </div>
         <div class="slider-grid-3">
           <input type="range" min="50" max="720" step="5" bind:value={fuelKg} on:input={recalculateInteractiveKinematics} title="Jet-A Usable Fuel (kg)" />
@@ -325,6 +385,7 @@
       </div>
     </div>
 
+    <!-- Telemetry Cards -->
     <div class="cg-telemetry">
       <div class="tel-item">
         <span class="tel-label">GROSS WEIGHT</span>
@@ -485,11 +546,84 @@
     gap: 6px;
   }
 
-  .slider-grid-3 input[type='range'] {
+  .airframe-badge {
+    font-size: 9px;
+    font-weight: 800;
+    font-family: var(--font-mono);
+    padding: 1px 5px;
+    background: rgba(0, 229, 255, 0.12);
+    color: var(--color-info);
+    border: 1px solid rgba(0, 229, 255, 0.35);
+  }
+
+  .svg-container-box {
+    position: relative;
     width: 100%;
-    height: 4px;
-    padding: 0;
-    accent-color: var(--color-go);
-    cursor: pointer;
+  }
+
+  .meters-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+  }
+
+  .meter-box {
+    background: var(--bg-void);
+    border: 1px solid var(--border-hairline);
+    padding: 4px 6px;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+
+  .meter-header {
+    display: flex;
+    justify-content: space-between;
+    font-size: 8px;
+    font-weight: 700;
+    color: var(--text-muted);
+    letter-spacing: 0.06em;
+  }
+
+  .meter-stat {
+    font-family: var(--font-mono);
+    color: var(--text-secondary);
+  }
+
+  .meter-track {
+    position: relative;
+    width: 100%;
+    height: 6px;
+    background: #06070a;
+    border: 1px solid var(--border-hairline);
+    overflow: hidden;
+  }
+
+  .meter-fill {
+    height: 100%;
+    transition: width 0.15s ease-out, background-color 0.15s ease-out;
+  }
+
+  .fill-go {
+    background: var(--color-go);
+  }
+
+  .fill-warn {
+    background: var(--color-caution);
+  }
+
+  .fill-danger {
+    background: var(--color-nogo);
+  }
+
+  .cg-marker-indicator {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 4px;
+    margin-left: -2px;
+    background: var(--color-go);
+    box-shadow: 0 0 6px var(--color-go);
+    transition: left 0.15s ease-out;
   }
 </style>
