@@ -25,6 +25,14 @@ import {
   defaultCorridor,
   defaultRegulatoryContext
 } from '../src/lib/stores/verdict';
+import {
+  latestKinematics,
+  currentGrossWeight,
+  currentCgLong,
+  currentCgLat,
+  isCgCompliant,
+  defaultKinematics
+} from '../src/lib/stores/kinematics';
 import { FIXTURE_METARS, FIXTURE_HAZARDS, FIXTURE_SCENARIOS } from '../src/lib/simulation/fixtures';
 import { ServerEvent, type ServerEnvelope, type ClientEnvelope } from '../src/lib/types/envelope';
 
@@ -239,5 +247,39 @@ describe('TraumaTeam Svelte WebSocket Router & Demultiplexing Stores', () => {
       error: 'station must be specified for GET_CONDITIONS'
     });
     expect(get(lastGatewayError)).toBe('station must be specified for GET_CONDITIONS');
+  });
+
+  it('routes KINEMATICS_EVALUATION frames to kinematics store and updates derived stores', () => {
+    router.connect();
+    mockWs.simulateOpen();
+
+    const mockKinematicsPayload = {
+      ...defaultKinematics,
+      airframe: 'Airbus H145 (BK117 D-2)',
+      verdict: 'CAUTION',
+      limiting_factor: 'OGE_HOVER_SCENE_DEFICIT',
+      mass_balance: {
+        ...defaultKinematics.mass_balance,
+        gross_weight_kg: 3420,
+        cg_long_mm: 3950,
+        cg_lat_mm: 25.5,
+        is_overall_compliant: true
+      }
+    };
+
+    mockWs.simulateServerFrame({
+      event: ServerEvent.KINEMATICS_EVALUATION,
+      request_id: 'kin-req-1',
+      timestamp_utc: '2026-11-05T20:01:00Z',
+      seq: 7,
+      payload: mockKinematicsPayload
+    });
+
+    expect(get(latestKinematics).verdict).toBe('CAUTION');
+    expect(get(latestKinematics).limiting_factor).toBe('OGE_HOVER_SCENE_DEFICIT');
+    expect(get(currentGrossWeight)).toBe(3420);
+    expect(get(currentCgLong)).toBe(3950);
+    expect(get(currentCgLat)).toBe(25.5);
+    expect(get(isCgCompliant)).toBe(true);
   });
 });

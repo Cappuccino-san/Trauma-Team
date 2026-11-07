@@ -5,6 +5,8 @@
   import CorridorControlPanel from './lib/components/CorridorControlPanel.svelte';
   import StationWeatherGrid from './lib/components/StationWeatherGrid.svelte';
   import HazardAndTracePanel from './lib/components/HazardAndTracePanel.svelte';
+  import RouteMap from './lib/components/RouteMap.svelte';
+  import CgEnvelope from './lib/components/CgEnvelope.svelte';
   import { wsRouter } from './lib/websocket';
   import { loadSimulationScenario } from './lib/simulation/fixtures';
 
@@ -23,9 +25,11 @@
   <main class="workspace-grid">
     <div class="left-rail">
       <CorridorControlPanel />
+      <CgEnvelope />
     </div>
 
     <div class="right-main">
+      <RouteMap />
       <StationWeatherGrid />
       <HazardAndTracePanel />
     </div>

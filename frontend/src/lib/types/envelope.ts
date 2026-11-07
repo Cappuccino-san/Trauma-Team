@@ -12,6 +12,7 @@ export const ClientAction = {
   UNSUBSCRIBE: 'UNSUBSCRIBE',
   GET_CONDITIONS: 'GET_CONDITIONS',
   EVALUATE_MINIMUMS: 'EVALUATE_MINIMUMS',
+  EVALUATE_KINEMATICS: 'EVALUATE_KINEMATICS',
   PING: 'PING'
 } as const;
 
@@ -21,6 +22,7 @@ export const ServerEvent = {
   WEATHER_SNAPSHOT: 'WEATHER_SNAPSHOT',
   WEATHER_UPDATE: 'WEATHER_UPDATE',
   MINIMUMS_EVALUATION: 'MINIMUMS_EVALUATION',
+  KINEMATICS_EVALUATION: 'KINEMATICS_EVALUATION',
   HAZARD_ALERT: 'HAZARD_ALERT',
   PONG: 'PONG',
   ACK: 'ACK',
@@ -245,12 +247,25 @@ export interface ComplianceReport {
 // 5. WebSocket Protocol Envelopes
 // -----------------------------------------------------------------------------
 
+export interface KinematicsParams {
+  airframe_id: number;
+  station_elevation_ft?: number;
+  true_course_deg?: number;
+  leg_distance_nm?: number;
+  fuel_weight_kg?: number;
+  payloads?: Array<{
+    station_id: number;
+    weight_kg: number;
+  }>;
+}
+
 export interface ClientParams {
   station?: string;
   stations?: string[];
   topics?: string[];
   corridor?: CorridorParams;
   regulatory_context?: RegulatoryContextParams;
+  kinematics?: KinematicsParams;
 }
 
 export interface ClientEnvelope {

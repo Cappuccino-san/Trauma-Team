@@ -153,3 +153,21 @@ cd services/weather_ingest && go test ./...
 # Svelte Dispatcher Console
 cd frontend && npm test
 ```
+
+---
+
+## Containerized Deployment (Docker Compose)
+
+TraumaTeam provides a production-grade multi-stage container pipeline compiling the Rust physics core (`cdylib`), Go telemetry gateway (`cgo`), and Svelte Edge UI into an isolated, reproducible stack:
+
+```bash
+# Build and launch all services with internal WebSocket and API routing
+docker compose up --build -d
+
+# Verify Gateway service health
+curl http://localhost:8080/healthz
+
+# Open Dispatcher Avionics Console
+# Access http://localhost:5173
+```
+

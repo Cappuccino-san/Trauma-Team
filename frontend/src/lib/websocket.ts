@@ -12,6 +12,7 @@ import {
 } from './types/envelope';
 import { ingestWeatherEnvelope, ingestHazardEnvelope } from './stores/weather';
 import { ingestMinimumsEnvelope, isEvaluating } from './stores/verdict';
+import { ingestKinematicsEnvelope } from './stores/kinematics';
 
 /**
  * Svelte WebSocket Router & Demultiplexer (`websocket.ts`)
@@ -208,6 +209,10 @@ export class TraumaTeamWebSocketRouter {
         ingestMinimumsEnvelope(envelope);
         break;
 
+      case ServerEvent.KINEMATICS_EVALUATION:
+        ingestKinematicsEnvelope(envelope);
+        break;
+
       case ServerEvent.HAZARD_ALERT:
         ingestHazardEnvelope(envelope);
         break;
@@ -390,6 +395,10 @@ export class TraumaTeamWebSocketRouter {
       case ServerEvent.MINIMUMS_EVALUATION: {
         const p = envelope.payload as { verdict?: string; limiting_factor?: string } | undefined;
         return `Verdict: ${p?.verdict ?? 'UNK'} (${p?.limiting_factor ?? 'NONE'})`;
+      }
+      case ServerEvent.KINEMATICS_EVALUATION: {
+        const k = envelope.payload as { verdict?: string; cruise_tas_kts?: number } | undefined;
+        return `Kinematics: ${k?.verdict ?? 'UNK'} TAS=${k?.cruise_tas_kts?.toFixed(0) ?? '--'}kt`;
       }
       case ServerEvent.HAZARD_ALERT: {
         const h = envelope.payload as { advisory_id?: string; hazard_type?: string } | undefined;
