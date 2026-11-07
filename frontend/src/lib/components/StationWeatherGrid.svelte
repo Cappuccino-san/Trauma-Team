@@ -49,7 +49,7 @@
 
 <section class="panel-box" aria-label="Station Weather Matrix">
   <div class="panel-header">
-    <span>02 // CORRIDOR METEOROLOGICAL MATRIX (METAR / DA / § 135.609 MARGINS)</span>
+    <span>04 // CORRIDOR METEOROLOGICAL MATRIX (METAR / DA / § 135.609 MARGINS)</span>
     <div class="header-actions">
       <input
         type="text"

@@ -123,7 +123,7 @@
 
 <div class="cg-card" aria-label="Center of Gravity Envelope Visualizer">
   <div class="panel-header">
-    <span>05 // ATMOSPHERE, MASS & CG ENVELOPE</span>
+    <span>02 // ATMOSPHERE, MASS & CG ENVELOPE (OEM AIRBUS H145 / BELL 429)</span>
     <span class="cg-status" class:compliant={$isCgCompliant} class:violation={!$isCgCompliant}>
       {$isCgCompliant ? 'COMPLIANT' : 'EXCEEDED'}
     </span>

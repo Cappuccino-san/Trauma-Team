@@ -12,6 +12,7 @@
   import { loadSimulationScenario } from './lib/simulation/fixtures';
 
   let showCustomModal = false;
+  let activeView: 'all' | 'flight-config' | 'map-wx' | 'audit-console' = 'all';
 
   onMount(() => {
     // Load initial deterministic NOAA AWC & FAA 14 CFR Part 135 Subpart L simulation state
@@ -25,24 +26,86 @@
   <ConnectionHeader onOpenCustomPreset={() => (showCustomModal = true)} />
   <CustomPresetModal isOpen={showCustomModal} onClose={() => (showCustomModal = false)} />
 
-  <main class="grid grid-cols-1 lg:grid-cols-12 gap-2.5 p-2.5 flex-1 items-start">
-    <!-- Left Column: CorridorControlPanel & CgEnvelope (col-span-3) -->
-    <div class="col-span-1 lg:col-span-3 col-span-3 lg:row-span-2 flex flex-col gap-2.5">
-      <CorridorControlPanel />
-      <CgEnvelope />
+  <!-- Top Workspace Navigation & Panel Index Bar -->
+  <nav class="workspace-nav" aria-label="Workspace Panel Focus">
+    <div class="nav-left">
+      <span class="nav-label">WORKSPACE LAYOUT:</span>
+      <button
+        type="button"
+        class="nav-pill"
+        class:active={activeView === 'all'}
+        on:click={() => (activeView = 'all')}
+      >
+        ALL MODULES (01–05)
+      </button>
+      <button
+        type="button"
+        class="nav-pill"
+        class:active={activeView === 'flight-config'}
+        on:click={() => (activeView = 'flight-config')}
+      >
+        01 // CORRIDOR &amp; 02 // MASS / CG
+      </button>
+      <button
+        type="button"
+        class="nav-pill"
+        class:active={activeView === 'map-wx'}
+        on:click={() => (activeView = 'map-wx')}
+      >
+        03 // GEODESIC MAP &amp; 04 // METAR MATRIX
+      </button>
+      <button
+        type="button"
+        class="nav-pill nav-pill-console"
+        class:active={activeView === 'audit-console'}
+        on:click={() => (activeView = 'audit-console')}
+      >
+        05 // AUDIT TRACE &amp; CLI CONSOLE
+      </button>
     </div>
+    <div class="nav-right">
+      <span class="flow-hint">FLOW: [01 CORRIDOR] → [02 MASS/CG] → [03 MAP] → [04 METAR] → [05 CONSOLE]</span>
+    </div>
+  </nav>
 
-    <!-- Top-Right Wide Section: VerdictBanner & RouteMap (col-span-9) -->
-    <div class="col-span-1 lg:col-span-9 col-span-9 flex flex-col gap-2.5">
-      <VerdictBanner />
-      <RouteMap />
-    </div>
+  <!-- Primary Dispatch Feasibility Verdict Banner (Full-Width Command Strip) -->
+  <div class="verdict-strip">
+    <VerdictBanner />
+  </div>
 
-    <!-- Bottom-Right Section: StationWeatherGrid & HazardAndTracePanel (col-span-9) -->
-    <div class="col-span-1 lg:col-span-9 col-span-9 flex flex-col gap-2.5">
-      <StationWeatherGrid />
-      <HazardAndTracePanel />
-    </div>
+  <!-- Structured 12-Column Avionics Grid (Sequential 01 -> 05) -->
+  <main class="grid grid-cols-1 lg:grid-cols-12 gap-2.5 px-2.5 pb-2.5 flex-1 items-start">
+    {#if activeView === 'all'}
+      <!-- Left Column (col-span-3): 01 Corridor Matrix & 02 Mass/CG Envelope -->
+      <div class="col-span-1 lg:col-span-3 flex flex-col gap-2.5">
+        <CorridorControlPanel />
+        <CgEnvelope />
+      </div>
+
+      <!-- Right Column (col-span-9): 03 RouteMap, 04 StationWeatherGrid, 05 HazardAndTracePanel -->
+      <div class="col-span-1 lg:col-span-9 flex flex-col gap-2.5">
+        <RouteMap />
+        <StationWeatherGrid />
+        <HazardAndTracePanel />
+      </div>
+    {:else if activeView === 'flight-config'}
+      <div class="col-span-1 lg:col-span-6 flex flex-col gap-2.5">
+        <CorridorControlPanel />
+      </div>
+      <div class="col-span-1 lg:col-span-6 flex flex-col gap-2.5">
+        <CgEnvelope />
+      </div>
+    {:else if activeView === 'map-wx'}
+      <div class="col-span-1 lg:col-span-12 flex flex-col gap-2.5">
+        <RouteMap />
+        <StationWeatherGrid />
+      </div>
+    {:else if activeView === 'audit-console'}
+      <div class="col-span-1 lg:col-span-12 flex flex-col gap-2.5">
+        <HazardAndTracePanel />
+        <StationWeatherGrid />
+      </div>
+    {/if}
   </main>
 
   <footer class="console-footer">
@@ -58,6 +121,69 @@
     display: flex;
     flex-direction: column;
     background: var(--bg-void);
+  }
+
+  .workspace-nav {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 5px 10px;
+    background: #0a0d13;
+    border-bottom: 1px solid var(--border-hairline);
+  }
+
+  .nav-left {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .nav-label {
+    font-size: 9px;
+    font-weight: 700;
+    color: var(--text-muted);
+    letter-spacing: 0.08em;
+    margin-right: 2px;
+  }
+
+  .nav-pill {
+    font-size: 9px;
+    padding: 3px 8px;
+    border: 1px solid var(--border-strong);
+    background: var(--bg-panel);
+    color: var(--text-secondary);
+    letter-spacing: 0.06em;
+  }
+
+  .nav-pill:hover {
+    color: var(--text-primary);
+    border-color: var(--text-secondary);
+  }
+
+  .nav-pill.active {
+    background: rgba(0, 229, 255, 0.12);
+    color: var(--color-info);
+    border-color: var(--color-info);
+    font-weight: 800;
+  }
+
+  .nav-pill-console.active {
+    background: rgba(0, 230, 118, 0.15);
+    color: var(--color-go);
+    border-color: var(--color-go);
+  }
+
+  .flow-hint {
+    font-size: 9px;
+    color: var(--text-muted);
+    letter-spacing: 0.06em;
+  }
+
+  .verdict-strip {
+    padding: 8px 10px 6px 10px;
   }
 
   .console-footer {

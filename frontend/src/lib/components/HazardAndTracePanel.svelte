@@ -91,7 +91,7 @@
 <section class="panel-container flex flex-col" aria-label="Audit Trace and SIGMET Console">
   <!-- Tab Navigation Header -->
   <div class="panel-header-bar">
-    <span class="panel-title">03 // DETERMINISTIC AUDIT TRACE & TELEMETRY CONSOLE</span>
+    <span class="panel-title">05 // DETERMINISTIC AUDIT TRACE & TELEMETRY CONSOLE</span>
     <div class="flex space-x-1">
       <button
         type="button"

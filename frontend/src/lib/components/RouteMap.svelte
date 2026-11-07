@@ -255,7 +255,7 @@
 
 <div class="map-card" aria-label="Aeronautical Route & SIGMET Overlay Map">
   <div class="panel-header">
-    <span>04 // AERONAUTICAL CORRIDOR & HAZARD GEODESIC (MAPLIBRE)</span>
+    <span>03 // AERONAUTICAL CORRIDOR & HAZARD GEODESIC (MAPLIBRE)</span>
     <div class="map-actions">
       <button type="button" on:click={focusCorridor}>CENTER ROUTE</button>
     </div>
