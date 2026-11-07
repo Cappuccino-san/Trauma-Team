@@ -52,17 +52,119 @@
 
   $: curX = scaleX($currentCgLong || 3864);
   $: curY = scaleY($currentGrossWeight || 2890);
+
+  // Interactive Kinematics & Mass/Balance Sliders (ported from Traumateam Console artifact)
+  let airframe = 'Airbus H145 (BK117 D-2)';
+  let fieldElevFt = 5885;
+  let oatC = 18.0;
+  let qnhInHg = 29.95;
+
+  let fuelKg = 420;
+  let payloadKg = 140;
+  let crewKg = 192;
+
+  function recalculateInteractiveKinematics() {
+    // 1. Atmospheric State (ICAO Standard Atmosphere)
+    const p0 = 29.9213;
+    const pa = fieldElevFt + 145442.156 * (1.0 - Math.pow(qnhInHg / p0, 0.190263));
+    const isaTempC = 15.0 - 1.98 * (pa / 1000.0);
+    const da = pa + 118.8 * (oatC - isaTempC);
+
+    // 2. Mass & CG Envelope (Airbus H145 / Bell 429)
+    const isH145 = airframe.includes('H145');
+    const emptyWeight = isH145 ? 2138.0 : 2045.0;
+    const emptyLongArm = isH145 ? 3910.0 : 3890.0;
+    const emptyLatArm = -5.0;
+
+    const totalGW = emptyWeight + fuelKg + payloadKg + crewKg;
+    const fuelArm = fuelKg <= 200 ? 4010 : 3980;
+    const crewArm = 3620;
+    const payloadArm = 4080;
+
+    const longMoment =
+      emptyWeight * emptyLongArm +
+      fuelKg * fuelArm +
+      crewKg * crewArm +
+      payloadKg * payloadArm;
+    const longCG = longMoment / totalGW;
+
+    const latMoment =
+      emptyWeight * emptyLatArm + fuelKg * 0.0 + crewKg * -12.0 + payloadKg * -20.0;
+    const latCG = latMoment / totalGW;
+
+    const mtow = isH145 ? 3700 : 3402;
+    const fwdLimit = totalGW <= 2600 ? 3780 : totalGW <= 3100 ? 3810 : 3855;
+    const aftLimit = 4190;
+    const isGwOk = totalGW <= mtow;
+    const isLongOk = longCG >= fwdLimit && longCG <= aftLimit;
+    const isLatOk = latCG >= -80 && latCG <= 80;
+    const isCompliant = isGwOk && isLongOk && isLatOk;
+
+    latestKinematics.update((prev) => ({
+      ...prev,
+      airframe,
+      pressure_altitude_ft: pa,
+      density_altitude_ft: da,
+      mass_balance: {
+        ...prev.mass_balance,
+        is_gw_compliant: isGwOk,
+        is_long_cg_compliant: isLongOk,
+        is_lat_cg_compliant: isLatOk,
+        is_overall_compliant: isCompliant,
+        gross_weight_kg: totalGW,
+        cg_long_mm: longCG,
+        cg_lat_mm: latCG,
+        fwd_limit_mm: fwdLimit,
+        aft_limit_mm: aftLimit
+      }
+    }));
+  }
 </script>
 
 <div class="cg-card" aria-label="Center of Gravity Envelope Visualizer">
   <div class="panel-header">
-    <span>05 // MASS & CG ENVELOPE (OEM AIRBUS H145 / BELL 429)</span>
+    <span>05 // ATMOSPHERE, MASS & CG ENVELOPE</span>
     <span class="cg-status" class:compliant={$isCgCompliant} class:violation={!$isCgCompliant}>
       {$isCgCompliant ? 'COMPLIANT' : 'EXCEEDED'}
     </span>
   </div>
 
   <div class="cg-body">
+    <!-- Airframe & Atmospheric Readouts (PA / DA) -->
+    <div class="atm-bar">
+      <div class="atm-cell">
+        <span class="tel-label">PRESSURE ALT</span>
+        <span class="tel-val text-cyan-400">{Math.round($latestKinematics.pressure_altitude_ft).toLocaleString()} FT</span>
+      </div>
+      <div class="atm-cell">
+        <span class="tel-label">DENSITY ALT</span>
+        <span class="tel-val text-amber-400">{Math.round($latestKinematics.density_altitude_ft).toLocaleString()} FT</span>
+      </div>
+      <div class="atm-cell">
+        <span class="tel-label">AIRFRAME</span>
+        <select bind:value={airframe} on:change={recalculateInteractiveKinematics} class="airframe-sel">
+          <option value="Airbus H145 (BK117 D-2)">H145 (D-2)</option>
+          <option value="Bell 429 GlobalRanger">BELL 429</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Interactive Atmospheric Sliders -->
+    <div class="sliders-box">
+      <div class="slider-row">
+        <div class="slider-lbl">
+          <span>Elev: <strong>{fieldElevFt.toLocaleString()} ft</strong></span>
+          <span>OAT: <strong>{oatC.toFixed(0)}°C</strong></span>
+          <span>QNH: <strong>{qnhInHg.toFixed(2)}"</strong></span>
+        </div>
+        <div class="slider-grid-3">
+          <input type="range" min="0" max="14000" step="50" bind:value={fieldElevFt} on:input={recalculateInteractiveKinematics} title="Field Elevation (ft)" />
+          <input type="range" min="-25" max="45" step="1" bind:value={oatC} on:input={recalculateInteractiveKinematics} title="Outside Air Temp (°C)" />
+          <input type="range" min="28.50" max="31.00" step="0.01" bind:value={qnhInHg} on:input={recalculateInteractiveKinematics} title="Altimeter QNH (inHg)" />
+        </div>
+      </div>
+    </div>
+
     <svg viewBox="0 0 {WIDTH} {HEIGHT}" class="cg-svg">
       <!-- Grid Lines -->
       {#each [2000, 2500, 3000, 3500] as gw}
@@ -94,6 +196,22 @@
       <line x1={curX} y1={curY - 8} x2={curX} y2={curY + 8} stroke={$isCgCompliant ? 'var(--color-go)' : 'var(--color-nogo)'} stroke-width="2" />
       <circle cx={curX} cy={curY} r="4" fill="none" stroke={$isCgCompliant ? 'var(--color-go)' : 'var(--color-nogo)'} stroke-width="1.5" />
     </svg>
+
+    <!-- Interactive Fuel, Payload & Crew Sliders -->
+    <div class="sliders-box">
+      <div class="slider-row">
+        <div class="slider-lbl">
+          <span>Fuel: <strong>{fuelKg}kg</strong></span>
+          <span>Payload: <strong>{payloadKg}kg</strong></span>
+          <span>Crew: <strong>{crewKg}kg</strong></span>
+        </div>
+        <div class="slider-grid-3">
+          <input type="range" min="50" max="720" step="5" bind:value={fuelKg} on:input={recalculateInteractiveKinematics} title="Jet-A Usable Fuel (kg)" />
+          <input type="range" min="0" max="350" step="5" bind:value={payloadKg} on:input={recalculateInteractiveKinematics} title="Patient + Gear Payload (kg)" />
+          <input type="range" min="150" max="420" step="5" bind:value={crewKg} on:input={recalculateInteractiveKinematics} title="Crew Weight (kg)" />
+        </div>
+      </div>
+    </div>
 
     <div class="cg-telemetry">
       <div class="tel-item">
@@ -202,5 +320,64 @@
   .tel-sub {
     font-size: 8px;
     color: var(--text-secondary);
+  }
+
+  .atm-bar {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 4px;
+  }
+
+  .atm-cell {
+    background: var(--bg-void);
+    padding: 3px 6px;
+    border: 1px solid var(--border-hairline);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+
+  .airframe-sel {
+    font-size: 9px;
+    padding: 1px 4px;
+    width: 100%;
+    font-weight: 700;
+  }
+
+  .sliders-box {
+    background: var(--bg-void);
+    border: 1px solid var(--border-hairline);
+    padding: 5px 6px;
+  }
+
+  .slider-row {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+
+  .slider-lbl {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    font-size: 9px;
+    color: var(--text-secondary);
+  }
+
+  .slider-lbl strong {
+    color: var(--text-primary);
+  }
+
+  .slider-grid-3 {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 6px;
+  }
+
+  .slider-grid-3 input[type='range'] {
+    width: 100%;
+    height: 4px;
+    padding: 0;
+    accent-color: var(--color-go);
+    cursor: pointer;
   }
 </style>
