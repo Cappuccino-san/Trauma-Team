@@ -60,6 +60,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Install Rust shared library and update ld cache
 COPY --from=rust-builder /usr/src/traumateam/crates/traumateam_rfm/target/release/libtraumateam_rfm.so /usr/local/lib/libtraumateam_rfm.so
+COPY --from=rust-builder /usr/src/traumateam/crates/traumateam_rfm/target/release/libtraumateam_rfm.so /usr/lib/libtraumateam_rfm.so
+ENV LD_LIBRARY_PATH=/usr/local/lib:/usr/lib:${LD_LIBRARY_PATH}
 RUN ldconfig
 
 # Install Go Gateway executable
