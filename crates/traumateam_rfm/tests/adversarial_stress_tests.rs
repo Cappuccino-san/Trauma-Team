@@ -90,7 +90,8 @@ fn test_adversarial_fuel_schedule_sweep() {
 
     // Test continuous fuel from -1000 kg to 5000 kg (beyond capacities 694 kg and 590 kg)
     let test_fuels = [
-        -1000.0, -50.0, -0.001, 0.0, 0.0001, 50.0, 150.0, 300.0, 500.0, 590.0, 694.0, 700.0, 1000.0, 5000.0,
+        -1000.0, -50.0, -0.001, 0.0, 0.0001, 50.0, 150.0, 300.0, 500.0, 590.0, 694.0, 700.0,
+        1000.0, 5000.0,
     ];
 
     for &f in &test_fuels {
@@ -158,7 +159,8 @@ fn test_adversarial_inf_clamping_behavior() {
     let max_pa_oge = h145.get_max_oge_hover_weight(Feet::new(14000.0), Celsius::new(15.0));
     assert_eq!(pos_inf_oge, max_pa_oge);
 
-    let neg_inf_oge = h145.get_max_oge_hover_weight(Feet::new(f64::NEG_INFINITY), Celsius::new(15.0));
+    let neg_inf_oge =
+        h145.get_max_oge_hover_weight(Feet::new(f64::NEG_INFINITY), Celsius::new(15.0));
     let min_pa_oge = h145.get_max_oge_hover_weight(Feet::new(-2000.0), Celsius::new(15.0));
     assert_eq!(neg_inf_oge, min_pa_oge);
 }
@@ -182,7 +184,9 @@ fn test_adversarial_dense_grid_parity_against_analytical_scipy() {
     let h145 = get_h145_rfm_spec();
 
     // 72-point comprehensive grid matching Python test_cases generated earlier
-    let pa_samples = [-2000.0, -1000.0, 0.0, 1500.0, 3000.0, 5500.0, 8000.0, 11000.0, 14000.0];
+    let pa_samples = [
+        -2000.0, -1000.0, 0.0, 1500.0, 3000.0, 5500.0, 8000.0, 11000.0, 14000.0,
+    ];
     let oat_samples = [-20.0, -15.0, -5.0, 0.0, 12.0, 25.0, 35.0, 50.0];
 
     for &pa in &pa_samples {
@@ -193,7 +197,8 @@ fn test_adversarial_dense_grid_parity_against_analytical_scipy() {
 
             // Verify monotonicity: higher altitude means lower or equal performance
             if pa > -2000.0 {
-                let lower_alt_oge = h145.get_max_oge_hover_weight(Feet::new(pa - 1000.0), Celsius::new(oat));
+                let lower_alt_oge =
+                    h145.get_max_oge_hover_weight(Feet::new(pa - 1000.0), Celsius::new(oat));
                 assert!(
                     oge.get() <= lower_alt_oge.get() + 1e-4,
                     "Monotonicity failed at PA={pa}, OAT={oat}"
@@ -218,25 +223,34 @@ fn test_adversarial_nan_panic_characterization() {
     let res_grid2d = std::panic::catch_unwind(|| {
         h145.get_max_oge_hover_weight(Feet::new(f64::NAN), Celsius::new(20.0))
     });
-    assert!(res_grid2d.is_ok(), "PerformanceGrid2D must not panic on NaN PA");
+    assert!(
+        res_grid2d.is_ok(),
+        "PerformanceGrid2D must not panic on NaN PA"
+    );
 
     // 2. PerformanceGrid2D with NaN OAT
     let res_grid2d_oat = std::panic::catch_unwind(|| {
         h145.get_max_oge_hover_weight(Feet::new(5000.0), Celsius::new(f64::NAN))
     });
-    assert!(res_grid2d_oat.is_ok(), "PerformanceGrid2D must not panic on NaN OAT");
+    assert!(
+        res_grid2d_oat.is_ok(),
+        "PerformanceGrid2D must not panic on NaN OAT"
+    );
 
     // 3. FuelSystemSpec::fuel_arm with NaN
-    let res_fuel = std::panic::catch_unwind(|| {
-        h145.fuel_system.fuel_arm(Kilograms::new(f64::NAN))
-    });
-    assert!(res_fuel.is_ok(), "FuelSystemSpec::fuel_arm must not panic on NaN fuel");
+    let res_fuel = std::panic::catch_unwind(|| h145.fuel_system.fuel_arm(Kilograms::new(f64::NAN)));
+    assert!(
+        res_fuel.is_ok(),
+        "FuelSystemSpec::fuel_arm must not panic on NaN fuel"
+    );
 
     // 4. RFMAirframeSpec::get_cg_limits_at_weight with NaN
-    let res_cg = std::panic::catch_unwind(|| {
-        h145.get_cg_limits_at_weight(Kilograms::new(f64::NAN))
-    });
-    assert!(res_cg.is_ok(), "get_cg_limits_at_weight must not panic on NaN weight");
+    let res_cg =
+        std::panic::catch_unwind(|| h145.get_cg_limits_at_weight(Kilograms::new(f64::NAN)));
+    assert!(
+        res_cg.is_ok(),
+        "get_cg_limits_at_weight must not panic on NaN weight"
+    );
 
     // 5. interp_1d with NaN
     let res_interp1d = std::panic::catch_unwind(|| {
@@ -245,10 +259,12 @@ fn test_adversarial_nan_panic_characterization() {
     assert!(res_interp1d.is_ok(), "interp_1d must not panic on NaN");
 
     // 6. compute_mass_and_balance with NaN fuel
-    let res_mb_fuel = std::panic::catch_unwind(|| {
-        compute_mass_and_balance(&h145, Kilograms::new(f64::NAN), &[])
-    });
-    assert!(res_mb_fuel.is_ok(), "compute_mass_and_balance must not panic on NaN fuel");
+    let res_mb_fuel =
+        std::panic::catch_unwind(|| compute_mass_and_balance(&h145, Kilograms::new(f64::NAN), &[]));
+    assert!(
+        res_mb_fuel.is_ok(),
+        "compute_mass_and_balance must not panic on NaN fuel"
+    );
     assert_eq!(
         res_mb_fuel.unwrap(),
         Err(traumateam_rfm::MassBalanceError::ZeroGrossWeight)

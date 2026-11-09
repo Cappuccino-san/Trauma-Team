@@ -252,7 +252,10 @@ impl FuelSystemSpec {
             return (self.tank_arms[0].arm_long, self.tank_arms[0].arm_lat);
         }
         if clamped >= self.tank_arms[n - 1].fuel_mass.get() {
-            return (self.tank_arms[n - 1].arm_long, self.tank_arms[n - 1].arm_lat);
+            return (
+                self.tank_arms[n - 1].arm_long,
+                self.tank_arms[n - 1].arm_lat,
+            );
         }
 
         let idx = self
@@ -380,10 +383,18 @@ impl RFMAirframeSpec {
         };
 
         CGLimits {
-            fwd_limit: Millimeters::new(p0.cg_long_fwd.get() + t * (p1.cg_long_fwd.get() - p0.cg_long_fwd.get())),
-            aft_limit: Millimeters::new(p0.cg_long_aft.get() + t * (p1.cg_long_aft.get() - p0.cg_long_aft.get())),
-            left_limit: Millimeters::new(p0.cg_lat_left.get() + t * (p1.cg_lat_left.get() - p0.cg_lat_left.get())),
-            right_limit: Millimeters::new(p0.cg_lat_right.get() + t * (p1.cg_lat_right.get() - p0.cg_lat_right.get())),
+            fwd_limit: Millimeters::new(
+                p0.cg_long_fwd.get() + t * (p1.cg_long_fwd.get() - p0.cg_long_fwd.get()),
+            ),
+            aft_limit: Millimeters::new(
+                p0.cg_long_aft.get() + t * (p1.cg_long_aft.get() - p0.cg_long_aft.get()),
+            ),
+            left_limit: Millimeters::new(
+                p0.cg_lat_left.get() + t * (p1.cg_lat_left.get() - p0.cg_lat_left.get()),
+            ),
+            right_limit: Millimeters::new(
+                p0.cg_lat_right.get() + t * (p1.cg_lat_right.get() - p0.cg_lat_right.get()),
+            ),
         }
     }
 
@@ -419,7 +430,8 @@ impl RFMAirframeSpec {
         } else {
             gw_raw
         };
-        self.cruise_performance.interpolate_tas(pa, oat, Kilograms::new(gw_clamped))
+        self.cruise_performance
+            .interpolate_tas(pa, oat, Kilograms::new(gw_clamped))
     }
 
     /// Evaluates cruise fuel flow rate in kg/hr.
@@ -433,7 +445,8 @@ impl RFMAirframeSpec {
         } else {
             gw_raw
         };
-        self.cruise_performance.interpolate_fuel_flow(pa, oat, Kilograms::new(gw_clamped))
+        self.cruise_performance
+            .interpolate_fuel_flow(pa, oat, Kilograms::new(gw_clamped))
     }
 
     /// Evaluates OGE hover fuel flow rate in kg/hr.
@@ -458,8 +471,14 @@ mod tests {
         assert_eq!(StationId::PilotRh.as_str(), "PILOT_RH");
         assert_eq!(StationId::CopilotLh.as_str(), "COPILOT_LH");
         assert_eq!(StationId::RescueHoistRh.as_str(), "RESCUE_HOIST_RH");
-        assert_eq!(StationId::from_known_str("PILOT_RH"), Some(StationId::PilotRh));
-        assert_eq!(StationId::from_known_str("COPILOT_LH"), Some(StationId::CopilotLh));
+        assert_eq!(
+            StationId::from_known_str("PILOT_RH"),
+            Some(StationId::PilotRh)
+        );
+        assert_eq!(
+            StationId::from_known_str("COPILOT_LH"),
+            Some(StationId::CopilotLh)
+        );
         assert_eq!(StationId::from_known_str("UNKNOWN_ID"), None);
         assert_eq!(format!("{}", StationId::PilotRh), "PILOT_RH");
     }
@@ -590,11 +609,14 @@ mod tests {
         let h145 = crate::airframes::get_h145_rfm_spec();
 
         let tas = h145.get_cruise_tas(Feet::new(0.0), Celsius::new(15.0), Kilograms::new(f64::NAN));
-        let tas_min = h145.get_cruise_tas(Feet::new(0.0), Celsius::new(15.0), h145.min_flight_weight);
+        let tas_min =
+            h145.get_cruise_tas(Feet::new(0.0), Celsius::new(15.0), h145.min_flight_weight);
         assert_eq!(tas, tas_min);
 
-        let ff = h145.get_cruise_fuel_flow(Feet::new(0.0), Celsius::new(15.0), Kilograms::new(f64::NAN));
-        let ff_min = h145.get_cruise_fuel_flow(Feet::new(0.0), Celsius::new(15.0), h145.min_flight_weight);
+        let ff =
+            h145.get_cruise_fuel_flow(Feet::new(0.0), Celsius::new(15.0), Kilograms::new(f64::NAN));
+        let ff_min =
+            h145.get_cruise_fuel_flow(Feet::new(0.0), Celsius::new(15.0), h145.min_flight_weight);
         assert_eq!(ff, ff_min);
     }
 }

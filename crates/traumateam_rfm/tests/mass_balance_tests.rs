@@ -11,9 +11,24 @@ fn test_mass_balance_analytical_hand_calculation() {
     let payloads = vec![
         PayloadItem::new("p1", "Pilot", StationId::PilotRh, Kilograms::new(85.0)),
         PayloadItem::new("p2", "Copilot", StationId::CopilotLh, Kilograms::new(80.0)),
-        PayloadItem::new("p3", "Nurse", StationId::CrewAttendantAftLh, Kilograms::new(70.0)),
-        PayloadItem::new("p4", "Medic", StationId::CrewAttendantAftRh, Kilograms::new(85.0)),
-        PayloadItem::new("p5", "Med Rack", StationId::MedicalCabinetRack, Kilograms::new(60.0)),
+        PayloadItem::new(
+            "p3",
+            "Nurse",
+            StationId::CrewAttendantAftLh,
+            Kilograms::new(70.0),
+        ),
+        PayloadItem::new(
+            "p4",
+            "Medic",
+            StationId::CrewAttendantAftRh,
+            Kilograms::new(85.0),
+        ),
+        PayloadItem::new(
+            "p5",
+            "Med Rack",
+            StationId::MedicalCabinetRack,
+            Kilograms::new(60.0),
+        ),
     ];
     let fuel = Kilograms::new(500.0);
 
@@ -39,10 +54,30 @@ fn test_lateral_cg_exceedance_detection() {
     let h145 = get_h145_rfm_spec();
 
     let payloads = vec![
-        PayloadItem::new("p1", "Heavy Pilot", StationId::PilotRh, Kilograms::new(110.0)),
-        PayloadItem::new("p2", "Heavy Attendant", StationId::CrewAttendantAftRh, Kilograms::new(110.0)),
-        PayloadItem::new("p3", "Heavy Med Rack", StationId::MedicalCabinetRack, Kilograms::new(100.0)),
-        PayloadItem::new("p4", "Rescue Hoist Load", StationId::RescueHoistRh, Kilograms::new(220.0)),
+        PayloadItem::new(
+            "p1",
+            "Heavy Pilot",
+            StationId::PilotRh,
+            Kilograms::new(110.0),
+        ),
+        PayloadItem::new(
+            "p2",
+            "Heavy Attendant",
+            StationId::CrewAttendantAftRh,
+            Kilograms::new(110.0),
+        ),
+        PayloadItem::new(
+            "p3",
+            "Heavy Med Rack",
+            StationId::MedicalCabinetRack,
+            Kilograms::new(100.0),
+        ),
+        PayloadItem::new(
+            "p4",
+            "Rescue Hoist Load",
+            StationId::RescueHoistRh,
+            Kilograms::new(220.0),
+        ),
     ];
     let fuel = Kilograms::new(100.0);
 
@@ -60,13 +95,48 @@ fn test_mtow_exceedance_detection() {
     let payloads = vec![
         PayloadItem::new("p1", "Pilot", StationId::PilotRh, Kilograms::new(100.0)),
         PayloadItem::new("p2", "Copilot", StationId::CopilotLh, Kilograms::new(100.0)),
-        PayloadItem::new("p3", "Crew LH", StationId::CrewAttendantAftLh, Kilograms::new(100.0)),
-        PayloadItem::new("p4", "Crew RH", StationId::CrewAttendantAftRh, Kilograms::new(100.0)),
-        PayloadItem::new("p5", "Patient", StationId::PrimaryPatientLitter, Kilograms::new(180.0)),
-        PayloadItem::new("p6", "Patient 2", StationId::SecondaryPatientLitter, Kilograms::new(150.0)),
-        PayloadItem::new("p7", "Cargo", StationId::AftAvionicsCargo, Kilograms::new(150.0)),
-        PayloadItem::new("p8", "Rack", StationId::MedicalCabinetRack, Kilograms::new(120.0)),
-        PayloadItem::new("p9", "Oxygen", StationId::OxygenSystem, Kilograms::new(50.0)),
+        PayloadItem::new(
+            "p3",
+            "Crew LH",
+            StationId::CrewAttendantAftLh,
+            Kilograms::new(100.0),
+        ),
+        PayloadItem::new(
+            "p4",
+            "Crew RH",
+            StationId::CrewAttendantAftRh,
+            Kilograms::new(100.0),
+        ),
+        PayloadItem::new(
+            "p5",
+            "Patient",
+            StationId::PrimaryPatientLitter,
+            Kilograms::new(180.0),
+        ),
+        PayloadItem::new(
+            "p6",
+            "Patient 2",
+            StationId::SecondaryPatientLitter,
+            Kilograms::new(150.0),
+        ),
+        PayloadItem::new(
+            "p7",
+            "Cargo",
+            StationId::AftAvionicsCargo,
+            Kilograms::new(150.0),
+        ),
+        PayloadItem::new(
+            "p8",
+            "Rack",
+            StationId::MedicalCabinetRack,
+            Kilograms::new(120.0),
+        ),
+        PayloadItem::new(
+            "p9",
+            "Oxygen",
+            StationId::OxygenSystem,
+            Kilograms::new(50.0),
+        ),
     ];
     let fuel = Kilograms::new(694.0);
 
@@ -83,8 +153,18 @@ fn test_forward_cg_exceedance_detection() {
 
     // Heavy cockpit loading, zero cabin payload, 0 fuel -> CG shifts forward of limit
     let payloads = vec![
-        PayloadItem::new("p1", "Heavy Pilot", StationId::PilotRh, Kilograms::new(130.0)),
-        PayloadItem::new("p2", "Heavy Copilot", StationId::CopilotLh, Kilograms::new(130.0)),
+        PayloadItem::new(
+            "p1",
+            "Heavy Pilot",
+            StationId::PilotRh,
+            Kilograms::new(130.0),
+        ),
+        PayloadItem::new(
+            "p2",
+            "Heavy Copilot",
+            StationId::CopilotLh,
+            Kilograms::new(130.0),
+        ),
     ];
     let fuel = Kilograms::new(0.0);
 
@@ -95,7 +175,10 @@ fn test_forward_cg_exceedance_detection() {
     // CG_long = 8,996,600 / 2400 = 3748.58 mm
     // Fwd limit at 2400 kg is 3787.5 mm -> CG is ~39 mm forward of boundary!
     assert!(!mb.is_long_cg_compliant);
-    assert_eq!(mb.limiting_factor, LimitingFactor::LongitudinalCgForwardExceeded);
+    assert_eq!(
+        mb.limiting_factor,
+        LimitingFactor::LongitudinalCgForwardExceeded
+    );
     assert!(mb.cg_long < mb.fwd_limit);
 }
 
@@ -118,16 +201,34 @@ fn test_aft_cg_exceedance_detection() {
     );
 
     let payloads = vec![
-        PayloadItem::new("p1", "Light Pilot", StationId::PilotRh, Kilograms::new(50.0)),
-        PayloadItem::new("p2", "Heavy Aft Load", aft_station_id, Kilograms::new(350.0)),
-        PayloadItem::new("p3", "Aft Cargo", StationId::AftAvionicsCargo, Kilograms::new(150.0)),
+        PayloadItem::new(
+            "p1",
+            "Light Pilot",
+            StationId::PilotRh,
+            Kilograms::new(50.0),
+        ),
+        PayloadItem::new(
+            "p2",
+            "Heavy Aft Load",
+            aft_station_id,
+            Kilograms::new(350.0),
+        ),
+        PayloadItem::new(
+            "p3",
+            "Aft Cargo",
+            StationId::AftAvionicsCargo,
+            Kilograms::new(150.0),
+        ),
     ];
     let fuel = Kilograms::new(0.0);
 
     let mb = compute_mass_and_balance(&h145, fuel, &payloads).expect("Calculation should succeed");
 
     assert!(!mb.is_long_cg_compliant);
-    assert_eq!(mb.limiting_factor, LimitingFactor::LongitudinalCgAftExceeded);
+    assert_eq!(
+        mb.limiting_factor,
+        LimitingFactor::LongitudinalCgAftExceeded
+    );
     assert!(mb.cg_long > mb.aft_limit);
 }
 
@@ -150,8 +251,18 @@ fn test_lateral_cg_left_exceedance_detection() {
     );
 
     let payloads = vec![
-        PayloadItem::new("p1", "LH Pilot", StationId::CopilotLh, Kilograms::new(110.0)),
-        PayloadItem::new("p2", "LH Attendant", StationId::CrewAttendantAftLh, Kilograms::new(110.0)),
+        PayloadItem::new(
+            "p1",
+            "LH Pilot",
+            StationId::CopilotLh,
+            Kilograms::new(110.0),
+        ),
+        PayloadItem::new(
+            "p2",
+            "LH Attendant",
+            StationId::CrewAttendantAftLh,
+            Kilograms::new(110.0),
+        ),
         PayloadItem::new("p3", "LH Hoist Load", left_hoist_id, Kilograms::new(250.0)),
     ];
     let fuel = Kilograms::new(100.0);
@@ -173,7 +284,8 @@ fn test_min_weight_violation_detection() {
     let payloads: Vec<PayloadItem> = Vec::new();
     let fuel = Kilograms::new(0.0);
 
-    let mb = compute_mass_and_balance(&airframe, fuel, &payloads).expect("Calculation should succeed");
+    let mb =
+        compute_mass_and_balance(&airframe, fuel, &payloads).expect("Calculation should succeed");
 
     assert!(!mb.is_gw_compliant);
     assert_eq!(mb.limiting_factor, LimitingFactor::MinWeightViolation);
@@ -184,13 +296,19 @@ fn test_min_weight_violation_detection() {
 fn test_unknown_station_error() {
     let h145 = get_h145_rfm_spec();
 
-    let payloads = vec![
-        PayloadItem::new("bad", "Ghost Gear", StationId::Custom("NON_EXISTENT_STATION"), Kilograms::new(50.0)),
-    ];
+    let payloads = vec![PayloadItem::new(
+        "bad",
+        "Ghost Gear",
+        StationId::Custom("NON_EXISTENT_STATION"),
+        Kilograms::new(50.0),
+    )];
     let fuel = Kilograms::new(200.0);
 
     let result = compute_mass_and_balance(&h145, fuel, &payloads);
-    assert!(matches!(result, Err(traumateam_rfm::MassBalanceError::StationNotFound(_))));
+    assert!(matches!(
+        result,
+        Err(traumateam_rfm::MassBalanceError::StationNotFound(_))
+    ));
 }
 
 #[test]
@@ -202,7 +320,10 @@ fn test_zero_gross_weight_error() {
     let fuel = Kilograms::new(0.0);
 
     let result = compute_mass_and_balance(&airframe, fuel, &payloads);
-    assert_eq!(result, Err(traumateam_rfm::MassBalanceError::ZeroGrossWeight));
+    assert_eq!(
+        result,
+        Err(traumateam_rfm::MassBalanceError::ZeroGrossWeight)
+    );
 }
 
 #[test]
@@ -212,8 +333,18 @@ fn test_bell429_mass_balance_calculation() {
     let payloads = vec![
         PayloadItem::new("p1", "Pilot", StationId::PilotRh, Kilograms::new(85.0)),
         PayloadItem::new("p2", "Copilot", StationId::CopilotLh, Kilograms::new(80.0)),
-        PayloadItem::new("p3", "Nurse", StationId::CrewAttendantLh, Kilograms::new(75.0)),
-        PayloadItem::new("p4", "Medic", StationId::CrewAttendantRh, Kilograms::new(80.0)),
+        PayloadItem::new(
+            "p3",
+            "Nurse",
+            StationId::CrewAttendantLh,
+            Kilograms::new(75.0),
+        ),
+        PayloadItem::new(
+            "p4",
+            "Medic",
+            StationId::CrewAttendantRh,
+            Kilograms::new(80.0),
+        ),
     ];
     let fuel = Kilograms::new(300.0);
 
@@ -247,20 +378,29 @@ fn test_bell429_mass_balance_calculation() {
 #[test]
 fn test_nan_payload_weight_returns_error() {
     let h145 = get_h145_rfm_spec();
-    let payloads = vec![
-        PayloadItem::new("bad", "Corrupted Sensor", StationId::PilotRh, Kilograms::new(f64::NAN)),
-    ];
+    let payloads = vec![PayloadItem::new(
+        "bad",
+        "Corrupted Sensor",
+        StationId::PilotRh,
+        Kilograms::new(f64::NAN),
+    )];
     let fuel = Kilograms::new(200.0);
 
     let result = compute_mass_and_balance(&h145, fuel, &payloads);
-    assert_eq!(result, Err(traumateam_rfm::MassBalanceError::ZeroGrossWeight));
+    assert_eq!(
+        result,
+        Err(traumateam_rfm::MassBalanceError::ZeroGrossWeight)
+    );
 }
 
 #[test]
 fn test_nan_fuel_weight_returns_error() {
     let h145 = get_h145_rfm_spec();
     let result = compute_mass_and_balance(&h145, Kilograms::new(f64::NAN), &[]);
-    assert_eq!(result, Err(traumateam_rfm::MassBalanceError::ZeroGrossWeight));
+    assert_eq!(
+        result,
+        Err(traumateam_rfm::MassBalanceError::ZeroGrossWeight)
+    );
 }
 
 #[test]
@@ -269,5 +409,8 @@ fn test_nan_empty_weight_returns_error() {
     h145.empty_weight = Kilograms::new(f64::NAN);
 
     let result = compute_mass_and_balance(&h145, Kilograms::new(200.0), &[]);
-    assert_eq!(result, Err(traumateam_rfm::MassBalanceError::ZeroGrossWeight));
+    assert_eq!(
+        result,
+        Err(traumateam_rfm::MassBalanceError::ZeroGrossWeight)
+    );
 }
