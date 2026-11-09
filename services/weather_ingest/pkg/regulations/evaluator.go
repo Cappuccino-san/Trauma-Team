@@ -102,6 +102,26 @@ func EvaluateCorridorCompliance(
 	rule := GetFAR135609Minimums(ctx)
 	legalCite := FormatLegalCitation(rule)
 
+	if len(stations) == 0 {
+		return models.ComplianceReport{
+			IsCompliant:          false,
+			Verdict:              models.VerdictDisqualified,
+			LimitingFactor:       models.LimitNoWeatherWithin15NM,
+			LegalRuleApplied:     legalCite,
+			WorstCeilingFt:       0,
+			WorstVisibilitySM:    0,
+			MinRequiredCeilingFt: rule.MinCeilingFt,
+			MinRequiredVisSM:     rule.MinVisibilitySM,
+			CeilingMarginFt:      -rule.MinCeilingFt,
+			VisMarginSM:          -rule.MinVisibilitySM,
+			Explanation:          "Corridor evaluation rejected: no valid weather reporting stations available for flight path (14 CFR § 135.609 / § 135.611)",
+			StationReports:       []models.StationComplianceReport{},
+			ActiveHazards:        []models.WeatherHazard{},
+			EvaluationTimeUTC:    now.Format(time.RFC3339),
+			AuditTrace:           []string{"ERROR: Empty corridor stations provided; cannot verify regulatory compliance"},
+		}
+	}
+
 	worstCeil := math.Inf(1)
 	worstVis := math.Inf(1)
 	maxGust := 0.0

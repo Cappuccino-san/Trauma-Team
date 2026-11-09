@@ -90,6 +90,7 @@ export class TraumaTeamWebSocketRouter {
     if (customUrl) {
       this.url = customUrl;
     }
+    this.autoReconnect = true;
     this.clearTimers();
 
     if (this.ws && (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING)) {

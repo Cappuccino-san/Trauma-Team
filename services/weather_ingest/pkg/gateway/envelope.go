@@ -7,6 +7,7 @@ const (
 	ActionGetConditions      = "GET_CONDITIONS"
 	ActionEvaluateMinimums   = "EVALUATE_MINIMUMS"
 	ActionEvaluateKinematics = "EVALUATE_KINEMATICS"
+	ActionInjectPreset       = "INJECT_PRESET"
 	ActionPing               = "PING"
 )
 
@@ -69,6 +70,7 @@ type ClientParams struct {
 	Corridor          *CorridorParams          `json:"corridor,omitempty"`
 	RegulatoryContext *RegulatoryContextParams `json:"regulatory_context,omitempty"`
 	Kinematics        *KinematicsParams        `json:"kinematics,omitempty"`
+	Preset            interface{}              `json:"preset,omitempty"`
 }
 
 // ClientEnvelope defines the inbound JSON contract from frontend clients (e.g. Svelte).

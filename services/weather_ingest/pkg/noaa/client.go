@@ -193,11 +193,20 @@ func (c *WeatherFeedClient) GetActiveHazards(ctx context.Context) ([]*models.Wea
 	return active, nil
 }
 
-// AddHazard registers a new active SIGMET hazard.
+// AddHazard registers a new active SIGMET hazard and prunes expired advisories.
 func (c *WeatherFeedClient) AddHazard(hazard *models.WeatherHazard) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.hazardsCache = append(c.hazardsCache, hazard)
+
+	now := time.Now().UTC()
+	pruned := make([]*models.WeatherHazard, 0, len(c.hazardsCache)+1)
+	for _, h := range c.hazardsCache {
+		if h != nil && (h.ValidUntil.IsZero() || h.ValidUntil.After(now)) {
+			pruned = append(pruned, h)
+		}
+	}
+	pruned = append(pruned, hazard)
+	c.hazardsCache = pruned
 }
 
 // ClearHazards clears all active hazards (useful for testing clean corridors).

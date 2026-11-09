@@ -55,26 +55,37 @@ func (h *Hub) Run() {
 			h.mu.Lock()
 			if _, ok := h.clients[client]; ok {
 				delete(h.clients, client)
-				close(client.send)
+				client.closeSend()
 			}
 			h.mu.Unlock()
 			log.Printf("[WebSocket Hub] Client disconnected. Total active: %d", len(h.clients))
 
 		case item := <-h.broadcast:
+			var slow []*Client
 			h.mu.RLock()
 			for client := range h.clients {
 				if client.IsSubscribed(item.topic) {
 					select {
 					case client.send <- item.message:
 					default:
-						// Slow consumer protection: non-blocking drop and unregister
-						log.Printf("[WebSocket Hub] Slow consumer detected. Dropping client to protect gateway.")
-						close(client.send)
-						delete(h.clients, client)
+						// Buffer full: queue for safe ejection outside of RLock
+						slow = append(slow, client)
 					}
 				}
 			}
 			h.mu.RUnlock()
+
+			if len(slow) > 0 {
+				h.mu.Lock()
+				for _, client := range slow {
+					if _, ok := h.clients[client]; ok {
+						log.Printf("[WebSocket Hub] Slow consumer detected. Safely evicting client.")
+						delete(h.clients, client)
+						client.closeSend()
+					}
+				}
+				h.mu.Unlock()
+			}
 		}
 	}
 }

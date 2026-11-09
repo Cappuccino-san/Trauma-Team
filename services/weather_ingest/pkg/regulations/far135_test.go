@@ -266,3 +266,17 @@ func TestFAR135615_LegacyHelperCompatibility(t *testing.T) {
 		t.Errorf("expected NO-GO, got %s", repLow.Verdict)
 	}
 }
+
+func TestEvaluateCorridorCompliance_EmptyStationsFailClosed(t *testing.T) {
+	ctx := models.RegulatoryContext{
+		IsDay:         true,
+		IsMountainous: false,
+	}
+	rep := EvaluateCorridorCompliance([]models.METAR{}, nil, ctx)
+	if rep.Verdict != models.VerdictDisqualified {
+		t.Errorf("expected DISQUALIFIED for empty stations corridor, got %s", rep.Verdict)
+	}
+	if rep.WorstCeilingFt != 0 || rep.WorstVisibilitySM != 0 {
+		t.Errorf("expected 0 ceiling and vis for unmonitored route, got %.0f, %.1f", rep.WorstCeilingFt, rep.WorstVisibilitySM)
+	}
+}

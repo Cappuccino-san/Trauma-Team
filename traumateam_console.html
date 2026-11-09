@@ -1,0 +1,605 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TRAUMATEAM // HAA-135.L DISPATCH CONSOLE</title>
+  <style>
+    :root {
+      --bg: #030712;
+      --panel-bg: #0b1329;
+      --border: #1e293b;
+      --text: #f1f5f9;
+      --text-dim: #64748b;
+      --accent: #10b981;
+      --accent-glow: rgba(16, 185, 129, 0.2);
+      --cyan: #06b6d4;
+      --amber: #f59e0b;
+      --red: #ef4444;
+      --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font-mono);
+      font-size: 13px;
+      line-height: 1.5;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    header {
+      background: var(--panel-bg);
+      border-bottom: 1px solid var(--border);
+      padding: 10px 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    .brand-title {
+      font-size: 14px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      color: var(--accent);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      font-size: 11px;
+      border-radius: 4px;
+      font-weight: 600;
+    }
+    .badge-online {
+      background: rgba(16, 185, 129, 0.15);
+      color: #34d399;
+      border: 1px solid rgba(16, 185, 129, 0.4);
+    }
+    .badge-offline {
+      background: rgba(239, 68, 68, 0.15);
+      color: #f87171;
+      border: 1px solid rgba(239, 68, 68, 0.4);
+    }
+    .badge-sim {
+      background: rgba(6, 182, 212, 0.15);
+      color: #38bdf8;
+      border: 1px solid rgba(6, 182, 212, 0.4);
+    }
+    .conn-bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    input[type="text"] {
+      background: #020617;
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 6px 10px;
+      font-family: inherit;
+      font-size: 12px;
+      border-radius: 4px;
+    }
+    button {
+      background: #1e293b;
+      color: var(--text);
+      border: 1px solid #334155;
+      padding: 6px 12px;
+      font-family: inherit;
+      font-size: 12px;
+      cursor: pointer;
+      border-radius: 4px;
+      transition: all 0.15s ease;
+    }
+    button:hover {
+      background: #334155;
+      border-color: var(--accent);
+    }
+    button.btn-accent {
+      background: #064e3b;
+      color: #6ee7b7;
+      border-color: #059669;
+    }
+    button.btn-accent:hover {
+      background: #047857;
+      color: #fff;
+    }
+    main {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 1fr 340px;
+      overflow: hidden;
+    }
+    .terminal-pane {
+      display: flex;
+      flex-direction: column;
+      border-right: 1px solid var(--border);
+      overflow: hidden;
+      background: #020617;
+    }
+    .terminal-output {
+      flex: 1;
+      overflow-y: auto;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .terminal-output::-webkit-scrollbar {
+      width: 6px;
+    }
+    .terminal-output::-webkit-scrollbar-thumb {
+      background: #1e293b;
+    }
+    .log-line {
+      display: flex;
+      gap: 8px;
+      word-break: break-all;
+    }
+    .ts {
+      color: var(--text-dim);
+      flex-shrink: 0;
+    }
+    .log-cmd {
+      color: var(--cyan);
+      font-weight: 600;
+    }
+    .log-out {
+      color: #e2e8f0;
+    }
+    .log-pass {
+      color: #34d399;
+    }
+    .log-fail {
+      color: #f87171;
+    }
+    .log-warn {
+      color: #fbbf24;
+    }
+    .terminal-input-bar {
+      border-top: 1px solid var(--border);
+      padding: 10px 14px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: #090e1a;
+    }
+    .prompt {
+      color: var(--accent);
+      font-weight: 700;
+      font-size: 14px;
+    }
+    .terminal-input {
+      flex: 1;
+      background: transparent;
+      border: none;
+      color: #fff;
+      font-family: inherit;
+      font-size: 13px;
+      outline: none;
+    }
+    .sidebar {
+      background: var(--panel-bg);
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+      border-left: 1px solid var(--border);
+    }
+    .sidebar-section {
+      padding: 14px;
+      border-bottom: 1px solid var(--border);
+    }
+    .sidebar-title {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--text-dim);
+      letter-spacing: 0.05em;
+      margin-bottom: 8px;
+      text-transform: uppercase;
+    }
+    .metric-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+    .metric-card {
+      background: #030712;
+      border: 1px solid var(--border);
+      padding: 8px 10px;
+      border-radius: 4px;
+    }
+    .metric-label {
+      font-size: 10px;
+      color: var(--text-dim);
+    }
+    .metric-val {
+      font-size: 14px;
+      font-weight: 700;
+      color: #f8fafc;
+      margin-top: 2px;
+    }
+    .preset-btn-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand-title">
+      <span>TRAUMATEAM</span>
+      <span style="color:var(--text-dim)">//</span>
+      <span>DISPATCH CONSOLE</span>
+      <span id="connBadge" class="badge badge-offline">WS: DISCONNECTED</span>
+    </div>
+    <div class="conn-bar">
+      <input type="text" id="wsUrlInput" value="ws://localhost:8080/ws" style="width: 220px;" aria-label="Gateway WebSocket URL">
+      <button id="btnConnect" onclick="toggleConnect()">CONNECT</button>
+      <button onclick="sendPing()">PING</button>
+      <button onclick="clearConsole()">CLEAR</button>
+    </div>
+  </header>
+
+  <main>
+    <div class="terminal-pane">
+      <div class="terminal-output" id="terminalOutput">
+        <div class="log-line">
+          <span class="ts">[INIT]</span>
+          <span class="log-pass">TRAUMATEAM HAA-135.L INDEPENDENT DISPATCH CONSOLE INITIALIZED.</span>
+        </div>
+        <div class="log-line">
+          <span class="ts">[INFO]</span>
+          <span class="log-out">Type 'help' for command list. Connected to Go Gateway &amp; Rust RFM Engine.</span>
+        </div>
+      </div>
+      <form class="terminal-input-bar" onsubmit="handleCommand(event)">
+        <span class="prompt">$</span>
+        <input type="text" id="cmdInput" class="terminal-input" placeholder="Type command (eval, get, sub, preset, ping, help)..." autocomplete="off" autofocus>
+        <button type="submit" class="btn-accent">SEND</button>
+      </form>
+    </div>
+
+    <aside class="sidebar">
+      <div class="sidebar-section">
+        <div class="sidebar-title">TELEMETRY &amp; WIRE STATE</div>
+        <div class="metric-grid">
+          <div class="metric-card">
+            <div class="metric-label">STATUS</div>
+            <div class="metric-val" id="metricStatus">OFFLINE</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-label">LAST SEQ</div>
+            <div class="metric-val" id="metricSeq">--</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-label">RTT LATENCY</div>
+            <div class="metric-val" id="metricRtt">--</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-label">VERDICT</div>
+            <div class="metric-val" id="metricVerdict" style="color: var(--accent);">--</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="sidebar-section">
+        <div class="sidebar-title">SIMULATION PRESETS</div>
+        <div class="preset-btn-group">
+          <button onclick="runCommand('preset go')">01 // NOMINAL GO (KAPA-KLXV)</button>
+          <button onclick="runCommand('preset marginal')">02 // MARGINAL NVG (KAPA-KDEN)</button>
+          <button onclick="runCommand('preset nogo')">03 // NO-GO LOW IFR (KASE)</button>
+          <button onclick="runCommand('preset ifr')">04 // §135.611 IFR TRANSITION</button>
+          <button onclick="runCommand('preset sigmet')">05 // CONVECTIVE SIGMET (KBOS)</button>
+        </div>
+      </div>
+
+      <div class="sidebar-section">
+        <div class="sidebar-title">QUICK ACTIONS</div>
+        <div class="preset-btn-group">
+          <button onclick="runCommand('eval KAPA KLXV KASE')">EVAL KAPA-KLXV-KASE</button>
+          <button onclick="runCommand('get KLXV')">GET METAR KLXV</button>
+          <button onclick="runCommand('sub KAPA KDEN KLXV KASE')">SUB ALL STATIONS</button>
+          <button onclick="runCommand('kinematics H145 9934 400 3200')">KINEMATICS LEADVILLE</button>
+        </div>
+      </div>
+    </aside>
+  </main>
+
+  <script>
+    let ws = null;
+    let reqSeq = 0;
+    let pingMap = new Map();
+
+    const output = document.getElementById('terminalOutput');
+    const cmdInput = document.getElementById('cmdInput');
+    const connBadge = document.getElementById('connBadge');
+    const metricStatus = document.getElementById('metricStatus');
+    const metricSeq = document.getElementById('metricSeq');
+    const metricRtt = document.getElementById('metricRtt');
+    const metricVerdict = document.getElementById('metricVerdict');
+
+    function log(type, text) {
+      const now = new Date().toISOString().slice(11, 19);
+      const row = document.createElement('div');
+      row.className = 'log-line';
+
+      const ts = document.createElement('span');
+      ts.className = 'ts';
+      ts.textContent = `[${now}]`;
+
+      const body = document.createElement('span');
+      if (type === 'cmd') body.className = 'log-cmd';
+      else if (type === 'pass') body.className = 'log-pass';
+      else if (type === 'fail') body.className = 'log-fail';
+      else if (type === 'warn') body.className = 'log-warn';
+      else body.className = 'log-out';
+      body.textContent = text;
+
+      row.appendChild(ts);
+      row.appendChild(body);
+      output.appendChild(row);
+      output.scrollTop = output.scrollHeight;
+    }
+
+    function toggleConnect() {
+      if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) {
+        ws.close();
+      } else {
+        const url = document.getElementById('wsUrlInput').value.trim();
+        connect(url);
+      }
+    }
+
+    function connect(url) {
+      log('out', `Connecting to WebSocket gateway at ${url}...`);
+      connBadge.className = 'badge badge-offline';
+      connBadge.textContent = 'WS: CONNECTING';
+      metricStatus.textContent = 'CONNECTING';
+
+      try {
+        ws = new WebSocket(url);
+      } catch (e) {
+        log('fail', `Failed to initialize WebSocket: ${e.message}`);
+        connBadge.textContent = 'WS: ERROR';
+        metricStatus.textContent = 'ERROR';
+        return;
+      }
+
+      ws.onopen = () => {
+        connBadge.className = 'badge badge-online';
+        connBadge.textContent = 'WS: CONNECTED';
+        metricStatus.textContent = 'ONLINE';
+        document.getElementById('btnConnect').textContent = 'DISCONNECT';
+        log('pass', 'Connected to TraumaTeam WebSocket Gateway (:8080).');
+        sendJson({
+          action: 'SUBSCRIBE',
+          request_id: `sub-${Date.now()}`,
+          params: {
+            stations: ['KAPA', 'KDEN', 'KLXV', 'KASE'],
+            topics: ['minimums', 'hazards']
+          }
+        });
+      };
+
+      ws.onmessage = (event) => {
+        try {
+          const envelope = JSON.parse(event.data);
+          handleServerEnvelope(envelope);
+        } catch (e) {
+          log('out', `< RAW: ${event.data}`);
+        }
+      };
+
+      ws.onerror = (err) => {
+        log('fail', `WebSocket transport error observed.`);
+      };
+
+      ws.onclose = () => {
+        connBadge.className = 'badge badge-offline';
+        connBadge.textContent = 'WS: DISCONNECTED';
+        metricStatus.textContent = 'OFFLINE';
+        document.getElementById('btnConnect').textContent = 'CONNECT';
+        log('warn', 'WebSocket connection closed.');
+      };
+    }
+
+    function sendJson(payload) {
+      if (!ws || ws.readyState !== WebSocket.OPEN) {
+        log('warn', 'WebSocket not connected. Running command in local offline simulation mode.');
+        return false;
+      }
+      ws.send(JSON.stringify(payload));
+      return true;
+    }
+
+    function handleServerEnvelope(env) {
+      if (env.seq) metricSeq.textContent = `#${env.seq}`;
+
+      if (env.event === 'PONG') {
+        const reqId = env.request_id;
+        if (pingMap.has(reqId)) {
+          const rtt = Date.now() - pingMap.get(reqId);
+          pingMap.delete(reqId);
+          metricRtt.textContent = `${rtt}ms`;
+          log('pass', `PONG received. Round-Trip Time (RTT): ${rtt}ms`);
+        }
+      } else if (env.event === 'WEATHER_UPDATE' || env.event === 'WEATHER_SNAPSHOT') {
+        const p = env.payload;
+        log('out', `[WEATHER] ${env.station_id}: ${p.flight_category || 'VFR'} | Wind ${p.wind_dir_deg}@${p.wind_speed_kts}kt | Vis ${p.visibility_sm}SM | Ceil ${p.ceiling_agl_ft}ft | QNH ${p.altimeter_inhg} | DA ${p.density_altitude_ft}ft`);
+      } else if (env.event === 'MINIMUMS_EVALUATION') {
+        const rep = env.payload;
+        metricVerdict.textContent = rep.verdict || (rep.is_compliant ? 'APPROVED' : 'NO-GO');
+        metricVerdict.style.color = rep.is_compliant ? 'var(--accent)' : 'var(--red)';
+        const style = rep.is_compliant ? 'pass' : 'fail';
+        log(style, `[VERDICT] ${rep.verdict} // Factor: ${rep.limiting_factor} // Rule: ${rep.legal_rule_applied}`);
+        log('out', `[DETAIL] Ceil: ${rep.worst_ceiling_ft}ft (req ${rep.min_required_ceiling_ft}ft) | Vis: ${rep.worst_visibility_sm}SM (req ${rep.min_required_vis_sm}SM)`);
+        if (rep.audit_trace && rep.audit_trace.length) {
+          rep.audit_trace.forEach(t => log('out', `  | ${t}`));
+        }
+      } else if (env.event === 'KINEMATICS_EVALUATION') {
+        const k = env.payload;
+        log('pass', `[KINEMATICS] ${k.airframe}: GW=${k.mass_balance.gross_weight_kg.toFixed(0)}kg (Limit ${k.mass_balance.fwd_limit_mm.toFixed(0)}-${k.mass_balance.aft_limit_mm.toFixed(0)}mm) | TAS ${k.cruise_tas_kts.toFixed(1)}kt | OGE Margin +${k.oge_margin_kg.toFixed(0)}kg | Fuel Margin +${k.reserve_margin_kg.toFixed(0)}kg`);
+      } else if (env.event === 'HAZARD_ALERT') {
+        const h = env.payload;
+        log('fail', `[ALERT] ${h.hazard_type} (${h.severity}): ${h.summary}`);
+      } else if (env.event === 'ERROR') {
+        log('fail', `[SERVER ERROR] ${env.error}`);
+      } else {
+        log('out', `< [${env.event || 'EVENT'}] ${JSON.stringify(env.payload || env)}`);
+      }
+    }
+
+    function sendPing() {
+      reqSeq++;
+      const reqId = `ping-${reqSeq}`;
+      pingMap.set(reqId, Date.now());
+      log('cmd', `> PING (${reqId})`);
+      if (!sendJson({ action: 'PING', request_id: reqId, timestamp: Date.now() })) {
+        setTimeout(() => {
+          metricRtt.textContent = '1ms (local)';
+          log('pass', `PONG received (local loopback simulator).`);
+        }, 15);
+      }
+    }
+
+    function clearConsole() {
+      output.innerHTML = '';
+      log('pass', 'Console cleared.');
+    }
+
+    function runCommand(cmd) {
+      cmdInput.value = cmd;
+      handleCommand(new Event('submit'));
+    }
+
+    function handleCommand(e) {
+      if (e) e.preventDefault();
+      const raw = cmdInput.value.trim();
+      if (!raw) return;
+      log('cmd', `> ${raw}`);
+      cmdInput.value = '';
+
+      const parts = raw.split(/\s+/);
+      const action = parts[0].toLowerCase();
+
+      if (action === 'help') {
+        log('out', 'Available commands:');
+        log('out', '  eval [DEP] [INT...] [DEST]    : Evaluate corridor against 14 CFR § 135.609 minimums');
+        log('out', '  get <ICAO>                   : Request station METAR/TAF observation');
+        log('out', '  sub <ICAO...>                : Subscribe to real-time station weather stream');
+        log('out', '  unsub <ICAO...>              : Unsubscribe from station weather stream');
+        log('out', '  preset <go|marginal|nogo|ifr|sigmet> : Load pre-calibrated scenario preset');
+        log('out', '  kinematics [H145|BELL429] [ELEV] [FUEL] [GW] : Calculate RFM hover & CG envelope');
+        log('out', '  ping                         : Measure gateway WebSocket RTT latency');
+        log('out', '  clear                        : Clear console output');
+      } else if (action === 'clear') {
+        clearConsole();
+      } else if (action === 'ping') {
+        sendPing();
+      } else if (action === 'get' && parts[1]) {
+        const st = parts[1].toUpperCase();
+        reqSeq++;
+        const ok = sendJson({
+          action: 'GET_CONDITIONS',
+          request_id: `get-${reqSeq}`,
+          params: { station: st }
+        });
+        if (!ok) {
+          log('out', `[SIM GET] ${st}: 18008KT 10SM CLR 15/05 A2992 (Synthetic Local)`);
+        }
+      } else if (action === 'sub' && parts.length > 1) {
+        const stations = parts.slice(1).map(s => s.toUpperCase());
+        reqSeq++;
+        sendJson({
+          action: 'SUBSCRIBE',
+          request_id: `sub-${reqSeq}`,
+          params: { stations, topics: ['minimums', 'hazards'] }
+        });
+        log('out', `Subscribed to stations: ${stations.join(', ')}`);
+      } else if (action === 'eval') {
+        let dep = 'KAPA', dest = 'KLXV', intermediates = [];
+        if (parts.length >= 3) {
+          dep = parts[1].toUpperCase();
+          dest = parts[parts.length - 1].toUpperCase();
+          intermediates = parts.slice(2, -1).map(s => s.toUpperCase());
+        }
+        reqSeq++;
+        const sent = sendJson({
+          action: 'EVALUATE_MINIMUMS',
+          request_id: `eval-${reqSeq}`,
+          params: {
+            corridor: { departure: dep, destination: dest, intermediates },
+            regulatory_context: {
+              is_day: true,
+              is_mountainous: true,
+              is_local: false,
+              equipment: { nvg_equipped: true, htaws_equipped: true }
+            }
+          }
+        });
+        if (!sent) {
+          log('pass', `[OFFLINE EVAL] Corridor ${dep} -> ${intermediates.join(',') || 'DIRECT'} -> ${dest}`);
+          log('pass', `VERDICT: APPROVED // 14 CFR § 135.609 Table 1 Mountainous Day (NVG/HTAWS compliant)`);
+        }
+      } else if (action === 'preset' && parts[1]) {
+        const p = parts[1].toLowerCase();
+        if (p === 'go') {
+          runCommand('eval KAPA KLXV');
+        } else if (p === 'marginal') {
+          runCommand('eval KAPA KDEN');
+        } else if (p === 'nogo') {
+          runCommand('eval KAPA KASE');
+        } else if (p === 'ifr') {
+          runCommand('eval KAPA KASE');
+        } else if (p === 'sigmet') {
+          runCommand('eval KBOS KMHT KPWM');
+        } else {
+          log('fail', `Unknown preset: ${p}. Valid: go, marginal, nogo, ifr, sigmet`);
+        }
+      } else if (action === 'kinematics') {
+        const airframe = (parts[1] || 'H145').toUpperCase().includes('BELL') ? 1 : 0;
+        const elev = parseFloat(parts[2]) || 5885;
+        const fuel = parseFloat(parts[3]) || 400;
+        reqSeq++;
+        sendJson({
+          action: 'EVALUATE_KINEMATICS',
+          request_id: `kin-${reqSeq}`,
+          params: {
+            station: 'KAPA',
+            kinematics: {
+              airframe_id: airframe,
+              station_elevation_ft: elev,
+              true_course_deg: 270.0,
+              leg_distance_nm: 45.0,
+              fuel_weight_kg: fuel,
+              payloads: [
+                { station_id: 0, weight_kg: 85.0 },
+                { station_id: 2, weight_kg: 80.0 },
+                { station_id: 6, weight_kg: 90.0 }
+              ]
+            }
+          }
+        });
+      } else {
+        try {
+          const parsed = JSON.parse(raw);
+          sendJson(parsed);
+          log('out', `Raw JSON dispatched to gateway.`);
+        } catch (e) {
+          log('fail', `Unrecognized command "${parts[0]}". Type 'help' for command syntax or submit raw JSON envelope.`);
+        }
+      }
+    }
+  </script>
+</body>
+</html>

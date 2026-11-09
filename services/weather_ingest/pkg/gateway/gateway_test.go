@@ -355,3 +355,39 @@ func TestGateway_EvaluateKinematicsWebSocketAction(t *testing.T) {
 		t.Errorf("expected request_id kin-bell429-default, got %s", respBell.RequestID)
 	}
 }
+
+func TestGateway_InjectPresetAction(t *testing.T) {
+	_, server, _, cleanup := setupTestGateway(t)
+	defer cleanup()
+
+	conn := dialWS(t, server)
+	defer conn.Close()
+
+	req := ClientEnvelope{
+		Action:    ActionInjectPreset,
+		RequestID: "preset-test-1",
+		Params: ClientParams{
+			Preset: map[string]interface{}{
+				"name": "TEST_PRESET",
+			},
+		},
+	}
+
+	if err := conn.WriteJSON(req); err != nil {
+		t.Fatalf("WriteJSON INJECT_PRESET failed: %v", err)
+	}
+
+	conn.SetReadDeadline(time.Now().Add(2 * time.Second))
+	var resp ServerEnvelope
+	if err := conn.ReadJSON(&resp); err != nil {
+		t.Fatalf("ReadJSON INJECT_PRESET failed: %v", err)
+	}
+
+	if resp.Event != EventAck {
+		t.Errorf("expected ACK event, got %s", resp.Event)
+	}
+	if resp.RequestID != "preset-test-1" {
+		t.Errorf("expected request_id preset-test-1, got %s", resp.RequestID)
+	}
+}
+

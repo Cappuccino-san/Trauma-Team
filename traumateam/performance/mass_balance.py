@@ -89,6 +89,13 @@ def compute_mass_and_balance(
     """Computes exact Gross Weight, Longitudinal CG, and Lateral CG,
     verifying compliance against certified RFM envelope limits.
     """
+    import math
+
+    if not math.isfinite(fuel_kg) or fuel_kg < 0:
+        raise ValueError(f"Invalid fuel weight: {fuel_kg}")
+    if not math.isfinite(airframe.empty_weight_kg) or airframe.empty_weight_kg <= 0:
+        raise ValueError(f"Invalid empty weight: {airframe.empty_weight_kg}")
+
     # 1. Base empty helicopter mass and moments
     w_empty = airframe.empty_weight_kg
     m_long = w_empty * airframe.empty_cg_long_mm
@@ -97,6 +104,8 @@ def compute_mass_and_balance(
 
     # 2. Add active payloads
     for item in active_payloads:
+        if not math.isfinite(item.weight_kg) or item.weight_kg < 0:
+            raise ValueError(f"Invalid payload weight for '{item.name}': {item.weight_kg}")
         station = airframe.stations.get(item.station_id)
         if station is None:
             raise KeyError(f"Station ID '{item.station_id}' for payload '{item.name}' not found on airframe {airframe.model_name}")

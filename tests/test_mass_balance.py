@@ -86,3 +86,22 @@ def test_mtow_exceedance_detection():
     assert mb.is_gw_compliant is False
     assert mb.limiting_factor == LimitingFactor.MTOW_EXCEEDED
     assert mb.gross_weight_kg > 3700.0
+
+def test_nan_and_negative_weights_raise_value_error():
+    """Validates that NaN and negative weights raise ValueError, matching Rust behavior."""
+    import math
+    h145 = get_h145_rfm_spec()
+
+    # NaN fuel weight
+    with pytest.raises(ValueError, match="Invalid fuel weight"):
+        compute_mass_and_balance(h145, fuel_kg=float("nan"), active_payloads=[])
+
+    # Negative fuel weight
+    with pytest.raises(ValueError, match="Invalid fuel weight"):
+        compute_mass_and_balance(h145, fuel_kg=-10.0, active_payloads=[])
+
+    # NaN payload weight
+    bad_payload = [PayloadItem(item_id="p1", name="Bad", station_id="PILOT_RH", weight_kg=float("nan"))]
+    with pytest.raises(ValueError, match="Invalid payload weight"):
+        compute_mass_and_balance(h145, fuel_kg=200.0, active_payloads=bad_payload)
+

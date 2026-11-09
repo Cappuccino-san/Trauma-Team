@@ -2,6 +2,7 @@ package noaa
 
 import (
 	"fmt"
+	"math"
 	"regexp"
 	"strconv"
 	"strings"
@@ -316,11 +317,39 @@ func determineFlightCategory(ceilFt float64, hasCeiling bool, visSM float64) mod
 	return models.FlightCategoryVFR
 }
 
-// DensityAltitudeFt calculates density altitude given pressure altitude and temperature in Celsius.
+// Standard atmosphere constants (ICAO Doc 7488/3)
+const (
+	t0K             = 288.15
+	p0Pa            = 101325.0
+	rAir            = 287.05287
+	g0              = 9.80665
+	lapseRateKPerM  = 0.0065
+	feetToMeters    = 0.3048
+	lapseRateKPerFt = lapseRateKPerM * feetToMeters
+	rho0KgPerM3     = 1.2250
+)
+
+// DensityAltitudeFt calculates thermodynamic density altitude using ICAO Doc 7488/3 standard atmosphere.
 func DensityAltitudeFt(pressureAltFt, tempC float64) float64 {
-	isaC := 15.0 - (0.0019812 * pressureAltFt)
-	deltaISA := tempC - isaC
-	return pressureAltFt + (118.8 * deltaISA)
+	t0Ft := t0K / lapseRateKPerFt
+	term := 1.0 - (pressureAltFt / t0Ft)
+	if term < 0.01 {
+		term = 0.01
+	}
+	power := g0 / (rAir * lapseRateKPerM)
+	pressurePa := math.Pow(term, power) * p0Pa
+
+	tk := tempC + 273.15
+	if tk < 100.0 {
+		tk = 100.0
+	}
+	rho := pressurePa / (rAir * tk)
+	densityRatio := rho / rho0KgPerM3
+	if densityRatio < 0.001 {
+		densityRatio = 0.001
+	}
+	invExp := 1.0 / (power - 1.0)
+	return t0Ft * (1.0 - math.Pow(densityRatio, invExp))
 }
 
 // PressureAltitudeFt calculates pressure altitude from station elevation and altimeter setting in inHg.

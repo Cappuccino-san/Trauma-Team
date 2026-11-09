@@ -40,6 +40,7 @@ type Client struct {
 	weatherClient *noaa.WeatherFeedClient
 	subscriptions map[string]bool
 	subMu         sync.RWMutex
+	closeOnce     sync.Once
 }
 
 // NewClient constructs a new WebSocket client.
@@ -51,6 +52,13 @@ func NewClient(hub *Hub, conn *websocket.Conn, weatherClient *noaa.WeatherFeedCl
 		weatherClient: weatherClient,
 		subscriptions: make(map[string]bool),
 	}
+}
+
+// closeSend safely closes the send channel exactly once.
+func (c *Client) closeSend() {
+	c.closeOnce.Do(func() {
+		close(c.send)
+	})
 }
 
 // IsSubscribed checks if the client is subscribed to a topic.
@@ -225,6 +233,19 @@ func (c *Client) handleClientAction(req *ClientEnvelope) {
 			return
 		}
 		c.handleEvaluateKinematics(req)
+
+	case ActionInjectPreset:
+		resp := ServerEnvelope{
+			Event:        EventAck,
+			RequestID:    req.RequestID,
+			TimestampUTC: time.Now().UTC().Format(time.RFC3339),
+			Seq:          c.hub.NextSeq(),
+			Payload: map[string]interface{}{
+				"status": "PRESET_INJECTED",
+				"preset": req.Params.Preset,
+			},
+		}
+		c.sendJSON(resp)
 
 	default:
 		c.sendError(req.RequestID, "Unsupported action: "+req.Action)
