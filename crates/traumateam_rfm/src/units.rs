@@ -127,10 +127,16 @@ macro_rules! define_unit {
 
 define_unit!(Kilograms, "Mass in kilograms (kg).");
 define_unit!(Millimeters, "Station coordinate arm in millimeters (mm).");
-define_unit!(KilogramMillimeters, "Static moment in kilogram-millimeters (kg·mm).");
+define_unit!(
+    KilogramMillimeters,
+    "Static moment in kilogram-millimeters (kg·mm)."
+);
 define_unit!(Feet, "Altitude or elevation in feet (ft).");
 define_unit!(Celsius, "Temperature in degrees Celsius (°C).");
-define_unit!(Knots, "Airspeed or groundspeed in nautical miles per hour (kt).");
+define_unit!(
+    Knots,
+    "Airspeed or groundspeed in nautical miles per hour (kt)."
+);
 define_unit!(KgPerHour, "Fuel mass consumption rate in kg/hr.");
 
 // Cross-dimensional physical operator semantics

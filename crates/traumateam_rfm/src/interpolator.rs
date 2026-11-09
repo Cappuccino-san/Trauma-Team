@@ -122,12 +122,16 @@ impl CruisePerformanceGrid3D {
     }
 
     pub fn interpolate_tas(&self, pa: Feet, oat: Celsius, gw: Kilograms) -> Knots {
-        let val = self.trilinear_interp(pa.get(), oat.get(), gw.get(), &self.tas_table, |k| k.get());
+        let val =
+            self.trilinear_interp(pa.get(), oat.get(), gw.get(), &self.tas_table, |k| k.get());
         Knots::new(val)
     }
 
     pub fn interpolate_fuel_flow(&self, pa: Feet, oat: Celsius, gw: Kilograms) -> KgPerHour {
-        let val = self.trilinear_interp(pa.get(), oat.get(), gw.get(), &self.fuel_flow_table, |ff| ff.get());
+        let val =
+            self.trilinear_interp(pa.get(), oat.get(), gw.get(), &self.fuel_flow_table, |ff| {
+                ff.get()
+            });
         KgPerHour::new(val)
     }
 
@@ -255,10 +259,23 @@ mod tests {
         let grid = PerformanceGrid2D::new("Test Grid", pa_grid, oat_grid, weights);
 
         // Exact corners
-        assert_eq!(grid.interpolate(Feet::new(0.0), Celsius::new(0.0)).get(), 3700.0);
-        assert_eq!(grid.interpolate(Feet::new(0.0), Celsius::new(30.0)).get(), 3500.0);
-        assert_eq!(grid.interpolate(Feet::new(5000.0), Celsius::new(0.0)).get(), 3400.0);
-        assert_eq!(grid.interpolate(Feet::new(5000.0), Celsius::new(30.0)).get(), 3200.0);
+        assert_eq!(
+            grid.interpolate(Feet::new(0.0), Celsius::new(0.0)).get(),
+            3700.0
+        );
+        assert_eq!(
+            grid.interpolate(Feet::new(0.0), Celsius::new(30.0)).get(),
+            3500.0
+        );
+        assert_eq!(
+            grid.interpolate(Feet::new(5000.0), Celsius::new(0.0)).get(),
+            3400.0
+        );
+        assert_eq!(
+            grid.interpolate(Feet::new(5000.0), Celsius::new(30.0))
+                .get(),
+            3200.0
+        );
 
         // Midpoint: (3700+3500)/2 = 3600 at 0 ft, (3400+3200)/2 = 3300 at 5000 ft
         // Midpoint at 2500 ft, 15 C: (3600+3300)/2 = 3450 kg
@@ -266,8 +283,16 @@ mod tests {
         assert!((mid.get() - 3450.0).abs() < 1e-6);
 
         // Clamping out-of-bounds
-        assert_eq!(grid.interpolate(Feet::new(-1000.0), Celsius::new(-10.0)).get(), 3700.0);
-        assert_eq!(grid.interpolate(Feet::new(10000.0), Celsius::new(50.0)).get(), 3200.0);
+        assert_eq!(
+            grid.interpolate(Feet::new(-1000.0), Celsius::new(-10.0))
+                .get(),
+            3700.0
+        );
+        assert_eq!(
+            grid.interpolate(Feet::new(10000.0), Celsius::new(50.0))
+                .get(),
+            3200.0
+        );
     }
 
     #[test]
@@ -300,8 +325,16 @@ mod tests {
 
         let grid = CruisePerformanceGrid3D::new(pa_grid, oat_grid, gw_grid, tas_table, ff_table);
 
-        let tas = grid.interpolate_tas(Feet::new(5000.0), Celsius::new(10.0), Kilograms::new(2500.0));
-        let ff = grid.interpolate_fuel_flow(Feet::new(5000.0), Celsius::new(10.0), Kilograms::new(2500.0));
+        let tas = grid.interpolate_tas(
+            Feet::new(5000.0),
+            Celsius::new(10.0),
+            Kilograms::new(2500.0),
+        );
+        let ff = grid.interpolate_fuel_flow(
+            Feet::new(5000.0),
+            Celsius::new(10.0),
+            Kilograms::new(2500.0),
+        );
 
         // Center of the cube:
         // Average of all 8 tas corners = (130+120+132+122+140+130+142+132)/8 = 1048/8 = 131.0
@@ -323,7 +356,15 @@ mod tests {
             vec![Kilograms::new(3400.0), Kilograms::new(3200.0)],
         ];
         let grid = PerformanceGrid2D::new("Test Grid", pa_grid, oat_grid, weights);
-        assert_eq!(grid.interpolate(Feet::new(f64::NAN), Celsius::new(0.0)).get(), 3700.0);
-        assert_eq!(grid.interpolate(Feet::new(0.0), Celsius::new(f64::NAN)).get(), 3700.0);
+        assert_eq!(
+            grid.interpolate(Feet::new(f64::NAN), Celsius::new(0.0))
+                .get(),
+            3700.0
+        );
+        assert_eq!(
+            grid.interpolate(Feet::new(0.0), Celsius::new(f64::NAN))
+                .get(),
+            3700.0
+        );
     }
 }

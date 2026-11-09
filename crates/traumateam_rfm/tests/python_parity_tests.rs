@@ -36,7 +36,10 @@ fn test_python_parity_high_da_mountain_rescue() {
 
     // Python bilinear calculation yields 2848 kg
     assert_relative_eq!(max_oge.get(), 2848.0, epsilon = 5.0);
-    assert!(max_oge.get() < 3000.0, "Must be derated due to density altitude");
+    assert!(
+        max_oge.get() < 3000.0,
+        "Must be derated due to density altitude"
+    );
 }
 
 #[test]
@@ -121,8 +124,8 @@ fn test_python_parity_h145_cg_envelope_margins() {
 
     let expected_fwd = 3795.0 + (220.0 / 600.0) * 20.0; // 3802.333 mm
     let expected_aft = 4190.0 - (220.0 / 600.0) * 20.0; // 4182.667 mm
-    let expected_left = -80.0 + (220.0 / 600.0) * 2.0;  // -79.2667 mm
-    let expected_right = 80.0 - (220.0 / 600.0) * 2.0;  // 79.2667 mm
+    let expected_left = -80.0 + (220.0 / 600.0) * 2.0; // -79.2667 mm
+    let expected_right = 80.0 - (220.0 / 600.0) * 2.0; // 79.2667 mm
 
     assert_relative_eq!(limits.fwd_limit.get(), expected_fwd, epsilon = 1e-4);
     assert_relative_eq!(limits.aft_limit.get(), expected_aft, epsilon = 1e-4);

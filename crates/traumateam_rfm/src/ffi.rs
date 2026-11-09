@@ -662,9 +662,8 @@ mod tests {
     fn test_ffi_atmosphere_leadville() {
         let mut pa = 0.0;
         let mut da = 0.0;
-        let rc = unsafe {
-            traumateam_compute_atmosphere_ffi(9800.0, 29.70, 28.0, &mut pa, &mut da)
-        };
+        let rc =
+            unsafe { traumateam_compute_atmosphere_ffi(9800.0, 29.70, 28.0, &mut pa, &mut da) };
         assert_eq!(rc, 0);
         assert!(pa > 9950.0 && pa < 10100.0);
         assert!(da > 13400.0 && da < 13800.0);

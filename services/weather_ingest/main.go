@@ -43,7 +43,7 @@ func main() {
 	grpcServer := grpc.NewServer()
 	weatherService := grpcpkg.NewWeatherServer(weatherClient, wsHub)
 	pb.RegisterWeatherIngestServiceServer(grpcServer, weatherService)
-	reflection.Register(grpcServer)
+	reflection.Register(grpcServer) // Enable gRPC reflection for client discovery
 
 	go func() {
 		log.Printf("[gRPC Server] Listening on :%d", *grpcPort)

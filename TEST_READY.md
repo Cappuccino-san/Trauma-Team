@@ -26,9 +26,8 @@ The comprehensive 4-Tier End-to-End (E2E) Test Suite for the TraumaTeam Weather 
 
 To execute the complete E2E test suite:
 
-```powershell
-$env:PATH = "C:\Users\Nick Napoli\go\bin;C:\Users\Nick Napoli\go_sdk\go\bin;" + $env:PATH
-cd "d:\SN850X\Home\Documents\Projects\TraumaTeam\services\weather_ingest"
+```bash
+cd services/weather_ingest
 go test -v -count=1 ./test/e2e/...
 ```
 

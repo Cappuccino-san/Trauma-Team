@@ -115,8 +115,16 @@ fn test_rfm_boundary_conditions_and_clamping() {
     assert_eq!(above_pa, table_max_pa);
 
     // Hover weights must never exceed MTOW
-    assert!(h145.get_max_ige_hover_weight(Feet::new(-2000.0), Celsius::new(-20.0)).get() <= h145.mtow.get());
-    assert!(h145.get_max_oge_hover_weight(Feet::new(-2000.0), Celsius::new(-20.0)).get() <= h145.mtow.get());
+    assert!(
+        h145.get_max_ige_hover_weight(Feet::new(-2000.0), Celsius::new(-20.0))
+            .get()
+            <= h145.mtow.get()
+    );
+    assert!(
+        h145.get_max_oge_hover_weight(Feet::new(-2000.0), Celsius::new(-20.0))
+            .get()
+            <= h145.mtow.get()
+    );
 }
 
 #[test]

@@ -1,0 +1,120 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  rust-core:
+    name: Rust Physics & RFM Core
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Rust Toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: crates/traumateam_rfm
+
+      - name: Check Formatting
+        run: cargo fmt --manifest-path crates/traumateam_rfm/Cargo.toml -- --check
+
+      - name: Run Clippy Linter
+        run: cargo clippy --manifest-path crates/traumateam_rfm/Cargo.toml -- -D warnings
+
+      - name: Run Cargo Tests
+        run: cargo test --manifest-path crates/traumateam_rfm/Cargo.toml --verbose
+
+  go-gateway:
+    name: Go Telemetry & Compliance Gateway
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Go Toolchain
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+          cache-dependency-path: services/weather_ingest/go.sum
+
+      - name: Verify Go Vet & Tests
+        working-directory: services/weather_ingest
+        run: |
+          go vet ./...
+          go test -v -race -count=1 ./...
+
+  python-engine:
+    name: Python Reference Engine & CLI
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+          version: "latest"
+
+      - name: Set up Python ${{ matrix.python-version }}
+        run: uv python install ${{ matrix.python-version }}
+
+      - name: Install Dependencies
+        run: uv sync --extra dev --python ${{ matrix.python-version }}
+
+      - name: Run Pytest & Hypothesis Suite
+        run: uv run --extra dev pytest -v
+
+      - name: Verify CLI Entry Points
+        run: |
+          uv run traumateam --help
+          uv run traumateam airframe --model H145
+          uv run traumateam regulations --environment non-mountainous --flight-phase day
+          uv run traumateam-demo
+          uv run python demo_dispatch.py
+
+  frontend-svelte:
+    name: Svelte 5 Dispatcher Console
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install Frontend Dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Run Typecheck
+        working-directory: frontend
+        run: npm run check
+
+      - name: Run Vitest Unit & Component Tests
+        working-directory: frontend
+        run: npm test
+
+      - name: Build Production Assets
+        working-directory: frontend
+        run: npm run build
