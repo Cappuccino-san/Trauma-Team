@@ -1,6 +1,7 @@
 # TraumaTeam: Deterministic HEMS Mission Feasibility & Dispatch Engine
 
 [![CI/CD Pipeline](https://github.com/Cappuccino-san/Trauma-Team/actions/workflows/ci.yml/badge.svg)](https://github.com/Cappuccino-san/Trauma-Team/actions/workflows/ci.yml)
+[![GitHub Pages](https://github.com/Cappuccino-san/Trauma-Team/actions/workflows/pages.yml/badge.svg)](https://cappuccino-san.github.io/Trauma-Team/)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-3776AB.svg?logo=python&logoColor=white)](https://www.python.org/)
 [![Rust 1.85+](https://img.shields.io/badge/rust-1.85+-DEA584.svg?logo=rust&logoColor=white)](https://www.rust-lang.org/)
 [![Go 1.24+](https://img.shields.io/badge/go-1.24+-00ADD8.svg?logo=go&logoColor=white)](https://go.dev/)
@@ -9,6 +10,8 @@
 [![FAA Part 135 Compliant](https://img.shields.io/badge/FAA-14_CFR_Part_135_Subpart_L-0A3A60.svg)](https://www.ecfr.gov/current/title-14/chapter-I/subchapter-G/part-135/subpart-L)
 
 **TraumaTeam** is an aviation flight operations engineering and dispatch decision engine purpose-built for Helicopter Emergency Medical Services (HEMS) operating under **FAA 14 CFR Part 135 Subpart L** (§§ 135.601–135.621), Part 91, and Part 135 Subpart D.
+
+> **Live Dispatcher Console (GitHub Pages):** [https://cappuccino-san.github.io/Trauma-Team/](https://cappuccino-san.github.io/Trauma-Team/) (Standalone HUD: [traumateam_console.html](https://cappuccino-san.github.io/Trauma-Team/traumateam_console.html))
 
 Rather than relying on simplified rule-of-thumb weight or static ceiling thresholds, TraumaTeam integrates raw OEM Rotorcraft Flight Manual (RFM) multi-dimensional tabular charts with real-time aeronautical and meteorological feeds (NOAA AWC METAR, TAF, Winds Aloft, SIGMETs) and terrain profiles.
 
