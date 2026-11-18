@@ -33,7 +33,11 @@
       } else if (!$regulatoryContext.is_day && $regulatoryContext.equipment.nvg_equipped) {
         loadSimulationScenario(wsRouter, 'MARGINAL_CAUTION');
       } else {
-        loadSimulationScenario(wsRouter, 'NOMINAL_GO');
+        loadSimulationScenario(wsRouter, 'NOMINAL_GO', {
+          departure: dep,
+          intermediates: inters,
+          destination: dest
+        });
       }
     }
   }

@@ -4,15 +4,32 @@
   import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url';
   import 'maplibre-gl/dist/maplibre-gl.css';
   import type { Feature, FeatureCollection } from 'geojson';
-  import { activeHazards } from '../stores/weather';
+  import { activeHazards, stationsById } from '../stores/weather';
   import { activeCorridor, currentVerdictTier } from '../stores/verdict';
+  import { latestKinematics } from '../stores/kinematics';
   import type { GeoCoordinate } from '../types/envelope';
 
   let mapContainer: HTMLDivElement;
   let map: maplibregl.Map | null = null;
   let markers: maplibregl.Marker[] = [];
   let isExpanded = false;
+  let mapLoaded = false;
   let lastCorridorKey = '';
+  let focusTimer: ReturnType<typeof setTimeout> | null = null;
+  let resizeTimer: ReturnType<typeof setTimeout> | null = null;
+  let pendingRafId: number | null = null;
+  let syncDirty = false;
+  let resizeObserver: ResizeObserver | null = null;
+
+  let appliedHazardsRef: typeof $activeHazards | null = null;
+  let appliedCorridorSig = '';
+  let appliedStrokeColor = '';
+  let appliedMarkersSig = '';
+
+  $: effectiveVerdictTier =
+    $currentVerdictTier === 'NO-GO' || !$latestKinematics.is_feasible
+      ? 'NO-GO'
+      : $currentVerdictTier;
 
   interface StationMeta {
     coords: [number, number];
@@ -219,23 +236,178 @@
     }
   }
 
+  interface ScreenBox {
+    left: number;
+    top: number;
+    right: number;
+    bottom: number;
+  }
+
+  type MarkerAnchor =
+    | 'bottom'
+    | 'top'
+    | 'left'
+    | 'right'
+    | 'bottom-left'
+    | 'bottom-right'
+    | 'top-left'
+    | 'top-right';
+
+  const ANCHOR_OFFSETS: Record<MarkerAnchor, [number, number]> = {
+    bottom: [0, -10],
+    top: [0, 10],
+    left: [12, 0],
+    right: [-12, 0],
+    'bottom-left': [10, -8],
+    'bottom-right': [-10, -8],
+    'top-left': [10, 8],
+    'top-right': [-10, 8]
+  };
+
+  function computeLabelBox(
+    px: number,
+    py: number,
+    width: number,
+    height: number,
+    anchor: MarkerAnchor
+  ): ScreenBox {
+    const [ox, oy] = ANCHOR_OFFSETS[anchor];
+    const ax = px + ox;
+    const ay = py + oy;
+    switch (anchor) {
+      case 'bottom':
+        return { left: ax - width / 2, right: ax + width / 2, top: ay - height, bottom: ay };
+      case 'top':
+        return { left: ax - width / 2, right: ax + width / 2, top: ay, bottom: ay + height };
+      case 'left':
+        return { left: ax, right: ax + width, top: ay - height / 2, bottom: ay + height / 2 };
+      case 'right':
+        return { left: ax - width, right: ax, top: ay - height / 2, bottom: ay + height / 2 };
+      case 'bottom-left':
+        return { left: ax, right: ax + width, top: ay - height, bottom: ay };
+      case 'bottom-right':
+        return { left: ax - width, right: ax, top: ay - height, bottom: ay };
+      case 'top-left':
+        return { left: ax, right: ax + width, top: ay, bottom: ay + height };
+      case 'top-right':
+        return { left: ax - width, right: ax, top: ay, bottom: ay + height };
+    }
+  }
+
+  function boxesOverlap(a: ScreenBox, b: ScreenBox, pad = 6): boolean {
+    return !(
+      a.right + pad <= b.left ||
+      a.left - pad >= b.right ||
+      a.bottom + pad <= b.top ||
+      a.top - pad >= b.bottom
+    );
+  }
+
+  function boxWithinViewport(box: ScreenBox, vw: number, vh: number): boolean {
+    if (vw <= 0 || vh <= 0) return true;
+    return box.left >= 8 && box.right <= vw - 44 && box.top >= 8 && box.bottom <= vh - 56;
+  }
+
+  function pickNonOverlappingPlacement(
+    coords: [number, number],
+    width: number,
+    height: number,
+    candidates: MarkerAnchor[],
+    occupied: ScreenBox[],
+    allowFallback: boolean
+  ): { anchor: MarkerAnchor; offset: [number, number]; box: ScreenBox } | null {
+    if (!map || typeof map.project !== 'function') {
+      const anchor = candidates[0];
+      return { anchor, offset: ANCHOR_OFFSETS[anchor], box: { left: 0, right: width, top: 0, bottom: height } };
+    }
+    const pt = map.project(coords);
+    const vw = mapContainer?.clientWidth || 0;
+    const vh = mapContainer?.clientHeight || 0;
+
+    for (const anchor of candidates) {
+      const box = computeLabelBox(pt.x, pt.y, width, height, anchor);
+      if (boxWithinViewport(box, vw, vh) && !occupied.some((o) => boxesOverlap(box, o))) {
+        return { anchor, offset: ANCHOR_OFFSETS[anchor], box };
+      }
+    }
+
+    for (const anchor of candidates) {
+      const box = computeLabelBox(pt.x, pt.y, width, height, anchor);
+      if (!occupied.some((o) => boxesOverlap(box, o))) {
+        return { anchor, offset: ANCHOR_OFFSETS[anchor], box };
+      }
+    }
+
+    if (!allowFallback) return null;
+    const fallback = candidates[0];
+    return {
+      anchor: fallback,
+      offset: ANCHOR_OFFSETS[fallback],
+      box: computeLabelBox(pt.x, pt.y, width, height, fallback)
+    };
+  }
+
   function syncWaypointMarkers() {
     if (!map) return;
     markers.forEach((m) => m.remove());
     markers = [];
 
     const stList = getCorridorStations($activeCorridor);
-    const accentColor = getVerdictStrokeColor($currentVerdictTier);
+    const accentColor = getVerdictStrokeColor(effectiveVerdictTier);
+    const occupiedBoxes: ScreenBox[] = [];
+
+    // Reserve small dot exclusion boxes at each station coordinate so labels avoid covering route circles
+    if (typeof map.project === 'function') {
+      stList.forEach((icao) => {
+        const meta = STATION_META[icao];
+        if (!meta || !map) return;
+        const pt = map.project(meta.coords);
+        occupiedBoxes.push({ left: pt.x - 8, right: pt.x + 8, top: pt.y - 8, bottom: pt.y + 8 });
+      });
+    }
+
+    const stationAnchors: MarkerAnchor[] = [
+      'bottom',
+      'top',
+      'left',
+      'right',
+      'bottom-left',
+      'bottom-right',
+      'top-left',
+      'top-right'
+    ];
 
     stList.forEach((icao, idx) => {
       const meta = STATION_META[icao];
       if (!meta || !map) return;
+      const tag = idx === 0 ? 'DEP' : idx === stList.length - 1 ? 'DST' : 'WPT';
+      const elevStr = `${meta.elevFt.toLocaleString()}'`;
+      const estWidth = 36 + (tag.length + icao.length + elevStr.length) * 6.4;
+      const placement = pickNonOverlappingPlacement(
+        meta.coords,
+        estWidth,
+        22,
+        stationAnchors,
+        occupiedBoxes,
+        true
+      );
+      if (!placement) return;
+      occupiedBoxes.push(placement.box);
+
       const el = document.createElement('div');
       el.className = 'icao-chip-marker';
       el.style.borderColor = accentColor;
-      const tag = idx === 0 ? 'DEP' : idx === stList.length - 1 ? 'DST' : 'WPT';
-      el.innerHTML = `<span class="chip-tag">${tag}</span><span class="chip-icao">${icao}</span><span class="chip-elev">${meta.elevFt.toLocaleString()}'</span>`;
-      const m = new maplibregl.Marker({ element: el, anchor: 'bottom', offset: [0, -8] })
+      el.style.zIndex = '20';
+      const stMetar = $stationsById[icao]?.metar;
+      if (stMetar?.raw_text) {
+        el.title = `${icao} (${stMetar.flight_category}): ${stMetar.raw_text}`;
+      }
+      el.innerHTML = `<span class="chip-tag">${tag}</span><span class="chip-icao">${icao}</span><span class="chip-elev">${elevStr}</span>`;
+      const m = new maplibregl.Marker({
+        element: el,
+        anchor: placement.anchor,
+        offset: placement.offset
+      })
         .setLngLat(meta.coords)
         .addTo(map);
       markers.push(m);
@@ -243,12 +415,40 @@
 
     const isColorado = stList.some((s) => STATION_META[s] && STATION_META[s].coords[0] < -90);
     if (isColorado) {
+      const peakAnchors: MarkerAnchor[] = [
+        'top',
+        'bottom',
+        'right',
+        'left',
+        'top-right',
+        'top-left',
+        'bottom-right',
+        'bottom-left'
+      ];
       TERRAIN_OBSTACLES.forEach((obs) => {
         if (!map) return;
+        const labelText = `▲ ${obs.label} ${obs.elevFt.toLocaleString()}'`;
+        const estWidth = 16 + labelText.length * 6.0;
+        const placement = pickNonOverlappingPlacement(
+          obs.coords,
+          estWidth,
+          20,
+          peakAnchors,
+          occupiedBoxes,
+          false
+        );
+        if (!placement) return;
+        occupiedBoxes.push(placement.box);
+
         const el = document.createElement('div');
         el.className = 'terrain-peak-marker';
-        el.textContent = `▲ ${obs.label} ${obs.elevFt.toLocaleString()}'`;
-        const m = new maplibregl.Marker({ element: el, anchor: 'top', offset: [0, 6] })
+        el.style.zIndex = '10';
+        el.textContent = labelText;
+        const m = new maplibregl.Marker({
+          element: el,
+          anchor: placement.anchor,
+          offset: placement.offset
+        })
           .setLngLat(obs.coords)
           .addTo(map);
         markers.push(m);
@@ -256,36 +456,171 @@
     }
   }
 
-  function updateLayers() {
-    if (!map || !map.isStyleLoaded()) return;
+  function ensureOverlaySourcesAndLayers(): boolean {
+    if (!map) return false;
+    let added = false;
 
-    const hazardSource = map.getSource('hazards') as maplibregl.GeoJSONSource | undefined;
-    if (hazardSource) {
-      hazardSource.setData(buildGeoJsonFromHazards($activeHazards));
+    if (!map.getSource('hazards')) {
+      map.addSource('hazards', {
+        type: 'geojson',
+        data: buildGeoJsonFromHazards($activeHazards)
+      });
+      added = true;
     }
 
-    const routeSource = map.getSource('route') as maplibregl.GeoJSONSource | undefined;
-    if (routeSource) {
-      routeSource.setData(buildRouteGeoJson($activeCorridor));
+    if (!map.getLayer('hazards-fill')) {
+      map.addLayer({
+        id: 'hazards-fill',
+        type: 'fill',
+        source: 'hazards',
+        paint: {
+          'fill-color': '#ff1744',
+          'fill-opacity': 0.28
+        }
+      });
+      added = true;
     }
 
-    const strokeColor = getVerdictStrokeColor($currentVerdictTier);
-    if (map.getLayer('route-line')) {
-      map.setPaintProperty('route-line', 'line-color', strokeColor);
-    }
-    if (map.getLayer('route-points')) {
-      map.setPaintProperty('route-points', 'circle-stroke-color', strokeColor);
+    if (!map.getLayer('hazards-line')) {
+      map.addLayer({
+        id: 'hazards-line',
+        type: 'line',
+        source: 'hazards',
+        paint: {
+          'line-color': '#ff1744',
+          'line-width': 2.5,
+          'line-dasharray': [2, 2]
+        }
+      });
+      added = true;
     }
 
-    syncWaypointMarkers();
+    if (!map.getSource('route')) {
+      map.addSource('route', {
+        type: 'geojson',
+        data: buildRouteGeoJson($activeCorridor)
+      });
+      added = true;
+    }
+
+    const initialColor = getVerdictStrokeColor(effectiveVerdictTier);
+    if (!map.getLayer('route-line')) {
+      map.addLayer({
+        id: 'route-line',
+        type: 'line',
+        source: 'route',
+        filter: ['==', '$type', 'LineString'],
+        paint: {
+          'line-color': initialColor,
+          'line-width': 3
+        }
+      });
+      added = true;
+    }
+
+    if (!map.getLayer('route-points')) {
+      map.addLayer({
+        id: 'route-points',
+        type: 'circle',
+        source: 'route',
+        filter: ['==', '$type', 'Point'],
+        paint: {
+          'circle-radius': 6,
+          'circle-color': '#05080c',
+          'circle-stroke-width': 2.5,
+          'circle-stroke-color': initialColor
+        }
+      });
+      added = true;
+    }
+
+    return added;
   }
 
-  $: if (map && ($activeHazards || $activeCorridor || $currentVerdictTier)) {
-    updateLayers();
+  function applyLayerSync(forceMarkers = false) {
+    if (!map || !mapLoaded) return;
+
+    ensureOverlaySourcesAndLayers();
+
+    const hazardsVal = $activeHazards;
+    if (hazardsVal !== appliedHazardsRef) {
+      appliedHazardsRef = hazardsVal;
+      const hazardSource = map.getSource('hazards') as maplibregl.GeoJSONSource | undefined;
+      if (hazardSource) {
+        hazardSource.setData(buildGeoJsonFromHazards(hazardsVal));
+      }
+    }
+
+    const corridorSig = `${$activeCorridor.departure}-${($activeCorridor.intermediates || []).join(',')}-${$activeCorridor.destination}`;
+    if (corridorSig !== appliedCorridorSig) {
+      appliedCorridorSig = corridorSig;
+      const routeSource = map.getSource('route') as maplibregl.GeoJSONSource | undefined;
+      if (routeSource) {
+        routeSource.setData(buildRouteGeoJson($activeCorridor));
+      }
+    }
+
+    const strokeColor = getVerdictStrokeColor(effectiveVerdictTier);
+    if (strokeColor !== appliedStrokeColor) {
+      appliedStrokeColor = strokeColor;
+      if (map.getLayer('route-line')) {
+        map.setPaintProperty('route-line', 'line-color', strokeColor);
+      }
+      if (map.getLayer('route-points')) {
+        map.setPaintProperty('route-points', 'circle-stroke-color', strokeColor);
+      }
+    }
+
+    const stationCats = getCorridorStations($activeCorridor)
+      .map((s) => `${s}:${$stationsById[s]?.metar?.flight_category ?? ''}`)
+      .join('|');
+    const markersSig = `${corridorSig}::${strokeColor}::${stationCats}`;
+    if (forceMarkers || markersSig !== appliedMarkersSig) {
+      appliedMarkersSig = markersSig;
+      syncWaypointMarkers();
+    }
   }
 
-  function focusCorridor() {
+  function cancelPendingSync() {
+    if (pendingRafId !== null) {
+      if (typeof cancelAnimationFrame === 'function') {
+        cancelAnimationFrame(pendingRafId);
+      } else {
+        clearTimeout(pendingRafId);
+      }
+      pendingRafId = null;
+    }
+    syncDirty = false;
+  }
+
+  function scheduleLayerSync() {
+    if (!map || !mapLoaded) return;
+    syncDirty = true;
+    if (pendingRafId !== null) return;
+
+    const raf =
+      typeof requestAnimationFrame === 'function'
+        ? requestAnimationFrame
+        : (cb: FrameRequestCallback) => setTimeout(() => cb(Date.now()), 0) as unknown as number;
+
+    pendingRafId = raf(() => {
+      pendingRafId = null;
+      if (!syncDirty || !map || !mapLoaded) return;
+      syncDirty = false;
+      applyLayerSync();
+    });
+  }
+
+  $: if (map && mapLoaded && ($activeHazards || $activeCorridor || $stationsById || effectiveVerdictTier)) {
+    scheduleLayerSync();
+  }
+
+  function focusCorridor(duration = 350) {
     if (!map) return;
+    if (focusTimer) {
+      clearTimeout(focusTimer);
+      focusTimer = null;
+    }
     const stList = getCorridorStations($activeCorridor);
 
     if (stList.length >= 2) {
@@ -294,13 +629,13 @@
         STATION_META[stList[1]].coords
       );
       stList.forEach((st) => bounds.extend(STATION_META[st].coords));
-      map.fitBounds(bounds, { padding: 70, maxZoom: 8.2, duration: 350 });
+      map.fitBounds(bounds, { padding: 72, maxZoom: 8.2, duration });
     } else if (stList.length === 1) {
-      map.flyTo({ center: STATION_META[stList[0]].coords, zoom: 7.5 });
+      map.flyTo({ center: STATION_META[stList[0]].coords, zoom: 7.5, duration });
     }
   }
 
-  $: if (map && $activeCorridor) {
+  $: if (map && mapLoaded && $activeCorridor) {
     const key = `${$activeCorridor.departure}-${($activeCorridor.intermediates || []).join(',')}-${$activeCorridor.destination}`;
     if (key !== lastCorridorKey) {
       lastCorridorKey = key;
@@ -310,12 +645,13 @@
 
   function toggleExpand() {
     isExpanded = !isExpanded;
-    setTimeout(() => {
+    if (resizeTimer) clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => {
       if (map) {
         map.resize();
-        focusCorridor();
+        focusCorridor(200);
       }
-    }, 60);
+    }, 220);
   }
 
   onMount(() => {
@@ -400,71 +736,50 @@
     );
 
     map.on('load', () => {
-      map?.addSource('hazards', {
-        type: 'geojson',
-        data: buildGeoJsonFromHazards($activeHazards)
-      });
-
-      map?.addLayer({
-        id: 'hazards-fill',
-        type: 'fill',
-        source: 'hazards',
-        paint: {
-          'fill-color': '#ff1744',
-          'fill-opacity': 0.28
-        }
-      });
-
-      map?.addLayer({
-        id: 'hazards-line',
-        type: 'line',
-        source: 'hazards',
-        paint: {
-          'line-color': '#ff1744',
-          'line-width': 2.5,
-          'line-dasharray': [2, 2]
-        }
-      });
-
-      map?.addSource('route', {
-        type: 'geojson',
-        data: buildRouteGeoJson($activeCorridor)
-      });
-
-      map?.addLayer({
-        id: 'route-line',
-        type: 'line',
-        source: 'route',
-        filter: ['==', '$type', 'LineString'],
-        paint: {
-          'line-color': getVerdictStrokeColor($currentVerdictTier),
-          'line-width': 3
-        }
-      });
-
-      map?.addLayer({
-        id: 'route-points',
-        type: 'circle',
-        source: 'route',
-        filter: ['==', '$type', 'Point'],
-        paint: {
-          'circle-radius': 6,
-          'circle-color': '#05080c',
-          'circle-stroke-width': 2.5,
-          'circle-stroke-color': getVerdictStrokeColor($currentVerdictTier)
-        }
-      });
-
-      if (map?.isStyleLoaded()) {
-        updateLayers();
-      } else {
-        syncWaypointMarkers();
-      }
-      setTimeout(focusCorridor, 100);
+      mapLoaded = true;
+      ensureOverlaySourcesAndLayers();
+      lastCorridorKey = `${$activeCorridor.departure}-${($activeCorridor.intermediates || []).join(',')}-${$activeCorridor.destination}`;
+      map?.resize();
+      focusCorridor(0);
+      applyLayerSync(true);
     });
+
+    map.on('styledata', () => {
+      if (!mapLoaded) return;
+      if (ensureOverlaySourcesAndLayers() || syncDirty) {
+        scheduleLayerSync();
+      }
+    });
+
+    map.on('zoomend', syncWaypointMarkers);
+    map.on('moveend', syncWaypointMarkers);
+
+    if (typeof ResizeObserver !== 'undefined' && mapContainer) {
+      resizeObserver = new ResizeObserver(() => {
+        if (map && mapLoaded) {
+          map.resize();
+          syncWaypointMarkers();
+        }
+      });
+      resizeObserver.observe(mapContainer);
+    }
   });
 
   onDestroy(() => {
+    mapLoaded = false;
+    cancelPendingSync();
+    if (focusTimer) {
+      clearTimeout(focusTimer);
+      focusTimer = null;
+    }
+    if (resizeTimer) {
+      clearTimeout(resizeTimer);
+      resizeTimer = null;
+    }
+    if (resizeObserver) {
+      resizeObserver.disconnect();
+      resizeObserver = null;
+    }
     markers.forEach((m) => m.remove());
     markers = [];
     if (map) {
@@ -478,12 +793,17 @@
   <div class="panel-header">
     <div class="flex items-center gap-2 min-w-0">
       <span class="truncate">03 // AERONAUTICAL CORRIDOR &amp; SIGMET GEODESIC</span>
-      <span class="corridor-summary">
+      <span
+        class="corridor-summary"
+        class:summary-nogo={effectiveVerdictTier === 'NO-GO'}
+        class:summary-caution={effectiveVerdictTier === 'CAUTION'}
+        class:summary-ifr={effectiveVerdictTier === 'IFR'}
+      >
         {$activeCorridor.departure || 'DEP'} → {($activeCorridor.intermediates || []).join(' → ') || 'DIRECT'} → {$activeCorridor.destination || 'DEST'}
       </span>
     </div>
     <div class="map-actions">
-      <button type="button" class="btn-action" on:click={focusCorridor}>CENTER ROUTE</button>
+      <button type="button" class="btn-action" on:click={() => focusCorridor()}>CENTER ROUTE</button>
       <button type="button" class="btn-action btn-expand" on:click={toggleExpand}>
         {isExpanded ? 'STANDARD (480PX)' : 'EXPAND (680PX)'}
       </button>
@@ -529,6 +849,24 @@
     padding: 1px 6px;
     border: 1px solid rgba(0, 230, 118, 0.3);
     white-space: nowrap;
+  }
+
+  .corridor-summary.summary-nogo {
+    color: var(--color-nogo);
+    background: rgba(255, 23, 68, 0.12);
+    border-color: rgba(255, 23, 68, 0.4);
+  }
+
+  .corridor-summary.summary-caution {
+    color: var(--color-caution);
+    background: rgba(255, 171, 0, 0.12);
+    border-color: rgba(255, 171, 0, 0.4);
+  }
+
+  .corridor-summary.summary-ifr {
+    color: var(--color-ifr);
+    background: rgba(0, 229, 255, 0.12);
+    border-color: rgba(0, 229, 255, 0.4);
   }
 
   .map-actions {
@@ -605,7 +943,9 @@
   }
 
   :global(.icao-chip-marker) {
+    z-index: 20;
     display: inline-flex;
+    width: max-content;
     align-items: center;
     gap: 4px;
     padding: 2px 5px;
@@ -636,6 +976,9 @@
   }
 
   :global(.terrain-peak-marker) {
+    z-index: 10;
+    display: inline-block;
+    width: max-content;
     padding: 1px 4px;
     background: rgba(18, 21, 28, 0.85);
     border: 1px solid #2d3545;

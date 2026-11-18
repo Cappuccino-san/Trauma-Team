@@ -585,14 +585,21 @@ let simSeq = 100;
  */
 export function loadSimulationScenario(
   router: TraumaTeamWebSocketRouter,
-  scenarioKey: keyof typeof FIXTURE_SCENARIOS = 'NOMINAL_GO'
+  scenarioKey: keyof typeof FIXTURE_SCENARIOS = 'NOMINAL_GO',
+  corridorOverride?: import('../types/envelope').CorridorParams
 ): void {
   const now = new Date().toISOString();
 
   // Clear stale hazards from previous scenario before loading new scenario
   activeHazards.set([]);
 
-  if (scenarioKey === 'NEW_ENGLAND_SIGMET') {
+  if (corridorOverride && corridorOverride.departure && corridorOverride.destination) {
+    activeCorridor.set({
+      departure: corridorOverride.departure.trim().toUpperCase(),
+      intermediates: (corridorOverride.intermediates || []).map((s) => s.trim().toUpperCase()).filter(Boolean),
+      destination: corridorOverride.destination.trim().toUpperCase()
+    });
+  } else if (scenarioKey === 'NEW_ENGLAND_SIGMET') {
     activeCorridor.set({
       departure: 'KBOS',
       intermediates: ['KMHT'],
