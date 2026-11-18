@@ -14,6 +14,7 @@
   let markers: maplibregl.Marker[] = [];
   let isExpanded = false;
   let mapLoaded = false;
+  let basemapLabel: 'CARTO DARK' | 'OFFLINE VECTOR' = 'CARTO DARK';
   let lastCorridorKey = '';
   let focusTimer: ReturnType<typeof setTimeout> | null = null;
   let resizeTimer: ReturnType<typeof setTimeout> | null = null;
@@ -659,10 +660,21 @@
       maplibregl.setWorkerUrl(new URL(maplibreWorkerUrl, window.location.href).href);
     }
 
-    // 100% air-gapped procedural aeronautical vector style (no external tiles or glyphs)
-    const offlineStyle: maplibregl.StyleSpecification = {
+    // CARTO Dark Matter raster basemap with procedural aeronautical graticule & terrain overlay/fallback
+    const mapStyle: maplibregl.StyleSpecification = {
       version: 8,
       sources: {
+        'carto-dark': {
+          type: 'raster',
+          tiles: [
+            'https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png',
+            'https://b.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png',
+            'https://c.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png',
+            'https://d.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png'
+          ],
+          tileSize: 256,
+          attribution: '© OpenStreetMap © CARTO'
+        },
         graticule: {
           type: 'geojson',
           data: buildProceduralGraticule()
@@ -674,10 +686,11 @@
       },
       layers: [
         {
-          id: 'tactical-void-bg',
-          type: 'background',
+          id: 'carto-dark-layer',
+          type: 'raster',
+          source: 'carto-dark',
           paint: {
-            'background-color': '#05080c'
+            'raster-opacity': 0.95
           }
         },
         {
@@ -687,7 +700,8 @@
           filter: ['==', ['get', 'major'], false],
           paint: {
             'line-color': '#0d141f',
-            'line-width': 1
+            'line-width': 1,
+            'line-opacity': 0.35
           }
         },
         {
@@ -697,7 +711,8 @@
           filter: ['==', ['get', 'major'], true],
           paint: {
             'line-color': '#162133',
-            'line-width': 1.2
+            'line-width': 1.2,
+            'line-opacity': 0.45
           }
         },
         {
@@ -706,7 +721,7 @@
           source: 'terrain-sectors',
           paint: {
             'fill-color': '#0d1624',
-            'fill-opacity': 0.72
+            'fill-opacity': 0.16
           }
         },
         {
@@ -716,7 +731,8 @@
           paint: {
             'line-color': '#1f304a',
             'line-width': 1.2,
-            'line-dasharray': [4, 3]
+            'line-dasharray': [4, 3],
+            'line-opacity': 0.65
           }
         }
       ]
@@ -724,7 +740,7 @@
 
     map = new maplibregl.Map({
       container: mapContainer,
-      style: offlineStyle,
+      style: mapStyle,
       center: [-105.6, 39.4],
       zoom: 6.4,
       attributionControl: false
@@ -734,6 +750,27 @@
       new maplibregl.NavigationControl({ showCompass: true, showZoom: true }),
       'top-right'
     );
+
+    map.on('error', (err: maplibregl.ErrorEvent & { sourceId?: string }) => {
+      if (err?.sourceId === 'carto-dark' && basemapLabel !== 'OFFLINE VECTOR') {
+        basemapLabel = 'OFFLINE VECTOR';
+        if (map?.getLayer('carto-dark-layer')) {
+          map.setLayoutProperty('carto-dark-layer', 'visibility', 'none');
+        }
+        if (map?.getLayer('terrain-sector-fill')) {
+          map.setPaintProperty('terrain-sector-fill', 'fill-opacity', 0.72);
+        }
+        if (map?.getLayer('graticule-minor')) {
+          map.setPaintProperty('graticule-minor', 'line-opacity', 1);
+        }
+        if (map?.getLayer('graticule-major')) {
+          map.setPaintProperty('graticule-major', 'line-opacity', 1);
+        }
+        if (map?.getLayer('terrain-sector-outline')) {
+          map.setPaintProperty('terrain-sector-outline', 'line-opacity', 1);
+        }
+      }
+    });
 
     map.on('load', () => {
       mapLoaded = true;
@@ -826,7 +863,14 @@
       </div>
       <div class="hud-item">
         <span class="hud-label">BASEMAP</span>
-        <span class="hud-val text-emerald-400">OFFLINE VECTOR</span>
+        <span
+          class="hud-val"
+          class:text-emerald-400={basemapLabel === 'CARTO DARK'}
+          class:text-amber-400={basemapLabel === 'OFFLINE VECTOR'}
+          data-testid="basemap-status"
+        >
+          {basemapLabel}
+        </span>
       </div>
     </div>
   </div>

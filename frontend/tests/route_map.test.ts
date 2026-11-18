@@ -13,6 +13,7 @@ const {
   setDataRouteMock,
   setDataHazardsMock,
   setPaintPropertyMock,
+  setLayoutPropertyMock,
   mapRemoveMock,
   markerCalls,
   markerRemoveMock
@@ -20,13 +21,14 @@ const {
   const setDataRouteMock = vi.fn();
   const setDataHazardsMock = vi.fn();
   const setPaintPropertyMock = vi.fn();
+  const setLayoutPropertyMock = vi.fn();
   const mapRemoveMock = vi.fn();
   const markerRemoveMock = vi.fn();
   const markerCalls: Array<{ anchor?: string; text?: string; zIndex?: string; lngLat?: unknown }> = [];
 
-  const handlers: Record<string, Array<() => void>> = {};
+  const handlers: Record<string, Array<(payload?: unknown) => void>> = {};
   const mapInstance = {
-    on: vi.fn((event: string, cb: () => void) => {
+    on: vi.fn((event: string, cb: (payload?: unknown) => void) => {
       handlers[event] = handlers[event] || [];
       handlers[event].push(cb);
     }),
@@ -39,11 +41,22 @@ const {
       return undefined;
     }),
     getLayer: vi.fn((id: string) =>
-      id === 'hazards-fill' || id === 'hazards-line' || id === 'route-line' || id === 'route-points'
+      [
+        'carto-dark-layer',
+        'graticule-minor',
+        'graticule-major',
+        'terrain-sector-fill',
+        'terrain-sector-outline',
+        'hazards-fill',
+        'hazards-line',
+        'route-line',
+        'route-points'
+      ].includes(id)
         ? {}
         : undefined
     ),
     setPaintProperty: setPaintPropertyMock,
+    setLayoutProperty: setLayoutPropertyMock,
     // Simulate MapLibre worker still busy (isStyleLoaded === false) during concurrent updates
     isStyleLoaded: vi.fn(() => false),
     fitBounds: vi.fn(),
@@ -54,8 +67,8 @@ const {
       x: (coords[0] + 108) * 180,
       y: (41 - coords[1]) * 180
     })),
-    __trigger: (event: string) => {
-      (handlers[event] || []).forEach((cb) => cb());
+    __trigger: (event: string, payload?: unknown) => {
+      (handlers[event] || []).forEach((cb) => cb(payload));
     },
     __resetHandlers: () => {
       for (const k of Object.keys(handlers)) delete handlers[k];
@@ -64,10 +77,11 @@ const {
 
   return {
     setWorkerUrlMock: vi.fn(),
-    mapConstructorMock: vi.fn(() => mapInstance),
+    mapConstructorMock: vi.fn((_opts?: unknown) => mapInstance),
     setDataRouteMock,
     setDataHazardsMock,
     setPaintPropertyMock,
+    setLayoutPropertyMock,
     mapRemoveMock,
     markerCalls,
     markerRemoveMock
@@ -117,13 +131,14 @@ describe('RouteMap static worker, coalesced concurrent updates & unmount cleanup
     setDataRouteMock.mockClear();
     setDataHazardsMock.mockClear();
     setPaintPropertyMock.mockClear();
+    setLayoutPropertyMock.mockClear();
     mapRemoveMock.mockClear();
     markerRemoveMock.mockClear();
     markerCalls.length = 0;
   });
 
-  it('coalesces concurrent WebSocket/store bursts via RAF, avoids marker z-index occlusion, and cleans up on unmount', async () => {
-    const { unmount } = render(RouteMap);
+  it('configures CARTO Dark basemap at bottom of layer stack, coalesces concurrent updates, falls back on tile error, and cleans up on unmount', async () => {
+    const { unmount, getByTestId } = render(RouteMap);
 
     expect(setWorkerUrlMock).toHaveBeenCalledTimes(1);
     const workerUrl = setWorkerUrlMock.mock.calls[0][0] as string;
@@ -134,8 +149,25 @@ describe('RouteMap static worker, coalesced concurrent updates & unmount cleanup
       mapConstructorMock.mock.invocationCallOrder[0]
     );
 
+    const mapOptions = mapConstructorMock.mock.calls[0][0] as unknown as {
+      style: {
+        sources: Record<string, { type: string; tileSize?: number; tiles?: string[]; attribution?: string }>;
+        layers: Array<{ id: string; type: string; source?: string }>;
+      };
+    };
+    expect(mapOptions.style.sources['carto-dark']?.type).toBe('raster');
+    expect(mapOptions.style.sources['carto-dark']?.tileSize).toBe(256);
+    expect(mapOptions.style.sources['carto-dark']?.tiles).toHaveLength(4);
+    expect(mapOptions.style.sources['carto-dark']?.attribution).toBe('© OpenStreetMap © CARTO');
+    expect(mapOptions.style.layers[0]).toMatchObject({
+      id: 'carto-dark-layer',
+      type: 'raster',
+      source: 'carto-dark'
+    });
+    expect(getByTestId('basemap-status').textContent?.trim()).toBe('CARTO DARK');
+
     const mapInstance = mapConstructorMock.mock.results[0].value as {
-      __trigger: (event: string) => void;
+      __trigger: (event: string, payload?: unknown) => void;
     };
     mapInstance.__trigger('load');
 
@@ -172,6 +204,13 @@ describe('RouteMap static worker, coalesced concurrent updates & unmount cleanup
     expect(setDataRouteMock).toHaveBeenCalledTimes(1);
     expect(setDataHazardsMock).toHaveBeenCalledTimes(1);
     expect(setPaintPropertyMock).toHaveBeenCalledWith('route-line', 'line-color', '#ff1744');
+
+    // Simulate raster tile error on carto-dark -> automatic fallback to OFFLINE VECTOR
+    mapInstance.__trigger('error', { sourceId: 'carto-dark', error: new Error('Tile network error') });
+    await Promise.resolve();
+    expect(getByTestId('basemap-status').textContent?.trim()).toBe('OFFLINE VECTOR');
+    expect(setLayoutPropertyMock).toHaveBeenCalledWith('carto-dark-layer', 'visibility', 'none');
+    expect(setPaintPropertyMock).toHaveBeenCalledWith('terrain-sector-fill', 'fill-opacity', 0.72);
 
     // Queue another update and immediately unmount before RAF fires to verify clean cancellation
     const cancelSpy = vi.spyOn(globalThis, 'cancelAnimationFrame');
