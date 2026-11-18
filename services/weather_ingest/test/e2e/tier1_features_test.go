@@ -10,11 +10,11 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"traumateam/weather_ingest/pkg/gateway"
 	"traumateam/weather_ingest/pkg/models"
 	"traumateam/weather_ingest/pkg/noaa"
 	"traumateam/weather_ingest/pkg/pb"
 	"traumateam/weather_ingest/pkg/regulations"
-	ws "traumateam/weather_ingest/pkg/websocket"
 )
 
 // =============================================================================
@@ -657,14 +657,14 @@ func TestTier1_WS_BroadcastMETARUpdate(t *testing.T) {
 		WindSpeedKts:       15.0,
 		FlightCategory:     models.FlightCategoryVFR,
 	}
-	h.Hub.BroadcastMETAR(obs)
+	h.Hub.BroadcastWeatherUpdate("KDEN", obs)
 
 	evt, err := h.ReadWSEvent(conn, 2*time.Second)
 	if err != nil {
 		t.Fatalf("ReadWSEvent failed: %v", err)
 	}
-	if evt.Type != "METAR_UPDATE" {
-		t.Errorf("expected METAR_UPDATE, got %s", evt.Type)
+	if evt.Event != gateway.EventWeatherUpdate {
+		t.Errorf("expected %s, got %s", gateway.EventWeatherUpdate, evt.Event)
 	}
 	payload, ok := evt.Payload.(map[string]interface{})
 	if !ok || payload["station_id"] != "KDEN" {
@@ -684,14 +684,13 @@ func TestTier1_WS_BroadcastMinimumsEvaluation(t *testing.T) {
 
 	time.Sleep(50 * time.Millisecond)
 
-	rep := regulations.FlightMinimumsReport{
-		StationID:               "KLXV",
-		IsCompliant:             true,
-		Verdict:                 "GO",
-		MinCeilingRequiredFt:    1000.0,
-		ActualCeilingFt:         8000.0,
-		MinVisibilityRequiredSM: 3.0,
-		ActualVisibilitySM:      10.0,
+	rep := &models.ComplianceReport{
+		IsCompliant:          true,
+		Verdict:              models.VerdictApproved,
+		MinRequiredCeilingFt: 1000.0,
+		WorstCeilingFt:       8000.0,
+		MinRequiredVisSM:     3.0,
+		WorstVisibilitySM:    10.0,
 	}
 	h.Hub.BroadcastMinimumsEvaluation(rep)
 
@@ -699,8 +698,8 @@ func TestTier1_WS_BroadcastMinimumsEvaluation(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ReadWSEvent failed: %v", err)
 	}
-	if evt.Type != "MINIMUMS_EVAL" {
-		t.Errorf("expected MINIMUMS_EVAL, got %s", evt.Type)
+	if evt.Event != gateway.EventMinimumsEvaluation {
+		t.Errorf("expected %s, got %s", gateway.EventMinimumsEvaluation, evt.Event)
 	}
 }
 
@@ -745,9 +744,12 @@ func TestTier1_WS_ClientSubscriptionMessage(t *testing.T) {
 	}
 	defer conn.Close()
 
-	msg := ws.ClientMessage{
-		Action:   "SUBSCRIBE_STATIONS",
-		Stations: []string{"KAPA", "KLXV"},
+	msg := gateway.ClientEnvelope{
+		Action:    gateway.ActionSubscribe,
+		RequestID: "sub-test-1",
+		Params: gateway.ClientParams{
+			Stations: []string{"KAPA", "KLXV"},
+		},
 	}
 	err = h.WriteClientMessage(conn, msg)
 	if err != nil {

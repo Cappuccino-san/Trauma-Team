@@ -345,12 +345,23 @@ pub fn solve_wind_triangle_native(
     wind_dir_deg: f64,
     wind_speed_kts: f64,
 ) -> (f64, f64, f64, f64, f64, bool) {
-    if !tas_kts.is_finite() || tas_kts <= 0.0 {
-        return (0.0, true_course_deg, 0.0, 0.0, 0.0, false);
+    if !tas_kts.is_finite()
+        || tas_kts <= 0.0
+        || !true_course_deg.is_finite()
+        || !wind_dir_deg.is_finite()
+        || !wind_speed_kts.is_finite()
+        || wind_speed_kts < 0.0
+    {
+        let safe_tc = if true_course_deg.is_finite() {
+            true_course_deg
+        } else {
+            0.0
+        };
+        return (0.0, safe_tc, 0.0, 0.0, 0.0, false);
     }
     let tc = true_course_deg.rem_euclid(360.0);
     let wd = wind_dir_deg.rem_euclid(360.0);
-    let ws = wind_speed_kts.max(0.0);
+    let ws = wind_speed_kts;
 
     let alpha_rad = (wd - tc).to_radians();
     let headwind = ws * alpha_rad.cos();
@@ -387,7 +398,7 @@ pub fn solve_wind_triangle_native(
 /// Returns the ABI version of the TraumaTeam Rust FFI library (`100` = v1.0.0).
 #[no_mangle]
 pub extern "C" fn traumateam_ffi_abi_version() -> u32 {
-    100
+    std::panic::catch_unwind(|| 100).unwrap_or(0)
 }
 
 /// Computes exact ICAO Pressure Altitude (ft) and Density Altitude (ft) via C ABI.
@@ -405,14 +416,26 @@ pub unsafe extern "C" fn traumateam_compute_atmosphere_ffi(
     if out_pa_ft.is_null() || out_da_ft.is_null() {
         return -1;
     }
-    if !elevation_ft.is_finite() || !altimeter_inhg.is_finite() || !oat_celsius.is_finite() {
-        return -2;
+    match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        if !elevation_ft.is_finite()
+            || !altimeter_inhg.is_finite()
+            || !oat_celsius.is_finite()
+            || altimeter_inhg <= 0.0
+        {
+            return -2;
+        }
+        let pa = compute_pressure_altitude_ft(elevation_ft, altimeter_inhg);
+        let da = compute_density_altitude_ft(pa, oat_celsius);
+        if !pa.is_finite() || !da.is_finite() {
+            return -2;
+        }
+        *out_pa_ft = pa;
+        *out_da_ft = da;
+        0
+    })) {
+        Ok(rc) => rc,
+        Err(_) => -99,
     }
-    let pa = compute_pressure_altitude_ft(elevation_ft, altimeter_inhg);
-    let da = compute_density_altitude_ft(pa, oat_celsius);
-    *out_pa_ft = pa;
-    *out_da_ft = da;
-    0
 }
 
 /// Evaluates aircraft Mass & Balance and CG envelope margins via C ABI.
@@ -434,6 +457,31 @@ pub unsafe extern "C" fn traumateam_eval_mass_balance_ffi(
     }
     *out_result = FfiMassBalanceResult::default();
 
+    match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        eval_mass_balance_inner(
+            airframe_id,
+            fuel_weight_kg,
+            payloads_ptr,
+            payloads_len,
+            out_result,
+        )
+    })) {
+        Ok(rc) => rc,
+        Err(_) => {
+            *out_result = FfiMassBalanceResult::default();
+            (*out_result).status_code = -99;
+            -99
+        }
+    }
+}
+
+unsafe fn eval_mass_balance_inner(
+    airframe_id: u32,
+    fuel_weight_kg: f64,
+    payloads_ptr: *const FfiPayloadItem,
+    payloads_len: usize,
+    out_result: *mut FfiMassBalanceResult,
+) -> i32 {
     let Some(spec) = airframe_spec(airframe_id) else {
         (*out_result).status_code = -2;
         return -2;
@@ -518,10 +566,33 @@ pub unsafe extern "C" fn traumateam_eval_mission_kinematics_ffi(
     payloads_len: usize,
     out_result: *mut FfiPerformanceKinematicResult,
 ) -> i32 {
-    if input_ptr.is_null() || out_result.is_null() {
+    if out_result.is_null() {
         return -1;
     }
     *out_result = FfiPerformanceKinematicResult::default();
+    if input_ptr.is_null() {
+        (*out_result).status_code = -1;
+        return -1;
+    }
+
+    match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        eval_mission_kinematics_inner(input_ptr, payloads_ptr, payloads_len, out_result)
+    })) {
+        Ok(rc) => rc,
+        Err(_) => {
+            *out_result = FfiPerformanceKinematicResult::default();
+            (*out_result).status_code = -99;
+            -99
+        }
+    }
+}
+
+unsafe fn eval_mission_kinematics_inner(
+    input_ptr: *const FfiWeatherMissionInput,
+    payloads_ptr: *const FfiPayloadItem,
+    payloads_len: usize,
+    out_result: *mut FfiPerformanceKinematicResult,
+) -> i32 {
     let input = &*input_ptr;
 
     let Some(spec) = airframe_spec(input.airframe_id) else {
@@ -529,9 +600,25 @@ pub unsafe extern "C" fn traumateam_eval_mission_kinematics_ffi(
         return -2;
     };
 
+    // Fail closed on any NaN, Inf, or physically invalid mission parameters
+    if !input.station_elevation_ft.is_finite()
+        || !input.altimeter_inhg.is_finite()
+        || input.altimeter_inhg <= 0.0
+        || !input.oat_celsius.is_finite()
+        || !input.wind_dir_deg.is_finite()
+        || !input.wind_speed_kts.is_finite()
+        || input.wind_speed_kts < 0.0
+        || !input.true_course_deg.is_finite()
+        || !input.leg_distance_nm.is_finite()
+        || input.leg_distance_nm < 0.0
+    {
+        (*out_result).status_code = -8;
+        return -8;
+    }
+
     // 1. Evaluate Mass & Balance first
     let mut mb_res = FfiMassBalanceResult::default();
-    let mb_rc = traumateam_eval_mass_balance_ffi(
+    let mb_rc = eval_mass_balance_inner(
         input.airframe_id,
         input.fuel_weight_kg,
         payloads_ptr,
@@ -850,5 +937,117 @@ mod tests {
             FfiLimitingFactorCode::OgeHoverSceneDeficit as u32
         );
         assert!(out_nogo.oge_margin_kg < 0.0);
+    }
+
+    #[test]
+    fn test_ffi_c_abi_struct_layout_and_alignment() {
+        assert_eq!(std::mem::size_of::<FfiPayloadItem>(), 16);
+        assert_eq!(std::mem::align_of::<FfiPayloadItem>(), 8);
+        assert_eq!(std::mem::size_of::<FfiWeatherMissionInput>(), 72);
+        assert_eq!(std::mem::align_of::<FfiWeatherMissionInput>(), 8);
+        assert_eq!(std::mem::size_of::<FfiMassBalanceResult>(), 104);
+        assert_eq!(std::mem::align_of::<FfiMassBalanceResult>(), 8);
+        assert_eq!(std::mem::size_of::<FfiPerformanceKinematicResult>(), 296);
+        assert_eq!(std::mem::align_of::<FfiPerformanceKinematicResult>(), 8);
+    }
+
+    #[test]
+    fn test_ffi_nan_inf_and_null_pointer_fail_closed() {
+        // 1. Null pointer guards
+        let mut pa = 0.0;
+        assert_eq!(
+            unsafe {
+                traumateam_compute_atmosphere_ffi(0.0, 29.92, 15.0, &mut pa, std::ptr::null_mut())
+            },
+            -1
+        );
+        assert_eq!(
+            unsafe {
+                traumateam_eval_mass_balance_ffi(0, 300.0, std::ptr::null(), 0, std::ptr::null_mut())
+            },
+            -1
+        );
+        let mut out_kin = FfiPerformanceKinematicResult::default();
+        assert_eq!(
+            unsafe {
+                traumateam_eval_mission_kinematics_ffi(
+                    std::ptr::null(),
+                    std::ptr::null(),
+                    0,
+                    &mut out_kin,
+                )
+            },
+            -1
+        );
+
+        // 2. Wind triangle NaN/Inf/negative wind guards
+        for &(tc, tas, wd, ws) in &[
+            (f64::NAN, 130.0, 180.0, 10.0),
+            (180.0, f64::NAN, 180.0, 10.0),
+            (180.0, 130.0, f64::INFINITY, 10.0),
+            (180.0, 130.0, 180.0, f64::NEG_INFINITY),
+            (180.0, 130.0, 180.0, -5.0),
+        ] {
+            let (gs, _th, _wca, _hw, _xw, flyable) = solve_wind_triangle_native(tc, tas, wd, ws);
+            assert!(!flyable);
+            assert_eq!(gs, 0.0);
+        }
+
+        // 3. Every float field of FfiWeatherMissionInput rejects NaN/Inf
+        let base = FfiWeatherMissionInput {
+            airframe_id: 0,
+            _padding: 0,
+            station_elevation_ft: 5000.0,
+            altimeter_inhg: 29.92,
+            oat_celsius: 15.0,
+            wind_dir_deg: 180.0,
+            wind_speed_kts: 10.0,
+            true_course_deg: 270.0,
+            leg_distance_nm: 30.0,
+            fuel_weight_kg: 400.0,
+        };
+
+        let mut cases = Vec::new();
+        for bad in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+            let mut c1 = base;
+            c1.station_elevation_ft = bad;
+            cases.push(c1);
+            let mut c2 = base;
+            c2.altimeter_inhg = bad;
+            cases.push(c2);
+            let mut c3 = base;
+            c3.oat_celsius = bad;
+            cases.push(c3);
+            let mut c4 = base;
+            c4.wind_dir_deg = bad;
+            cases.push(c4);
+            let mut c5 = base;
+            c5.wind_speed_kts = bad;
+            cases.push(c5);
+            let mut c6 = base;
+            c6.true_course_deg = bad;
+            cases.push(c6);
+            let mut c7 = base;
+            c7.leg_distance_nm = bad;
+            cases.push(c7);
+            let mut c8 = base;
+            c8.fuel_weight_kg = bad;
+            cases.push(c8);
+        }
+
+        for bad_input in cases {
+            let mut res = FfiPerformanceKinematicResult::default();
+            let rc = unsafe {
+                traumateam_eval_mission_kinematics_ffi(
+                    &bad_input,
+                    std::ptr::null(),
+                    0,
+                    &mut res,
+                )
+            };
+            assert!(rc < 0, "expected error status for bad input {bad_input:?}, got {rc}");
+            assert_eq!(res.is_feasible, 0);
+            assert_eq!(res.verdict_code, FfiVerdictCode::NoGo as u32);
+        }
     }
 }

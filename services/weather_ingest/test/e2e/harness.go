@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
-	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
@@ -16,55 +15,20 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/test/bufconn"
 
+	"traumateam/weather_ingest/pkg/gateway"
 	"traumateam/weather_ingest/pkg/grpc"
 	"traumateam/weather_ingest/pkg/models"
 	"traumateam/weather_ingest/pkg/noaa"
 	"traumateam/weather_ingest/pkg/pb"
-	"traumateam/weather_ingest/pkg/regulations"
-	ws "traumateam/weather_ingest/pkg/websocket"
 )
 
 const defaultBufSize = 1024 * 1024
-
-// harnessBroadcaster bridges grpc.Broadcaster interface to the WebSocket Hub.
-type harnessBroadcaster struct {
-	hub *ws.Hub
-}
-
-func (b *harnessBroadcaster) BroadcastWeatherUpdate(stationID string, metar *models.METAR) {
-	if b.hub != nil && metar != nil {
-		b.hub.BroadcastMETAR(metar)
-	}
-}
-
-func (b *harnessBroadcaster) BroadcastMinimumsEvaluation(rep *models.ComplianceReport) {
-	if b.hub != nil && rep != nil {
-		stID := "CORRIDOR"
-		if len(rep.StationReports) > 0 {
-			stID = rep.StationReports[0].StationID
-		}
-		b.hub.BroadcastMinimumsEvaluation(regulations.FlightMinimumsReport{
-			StationID:               stID,
-			IsCompliant:             rep.IsCompliant,
-			Verdict:                 string(rep.Verdict),
-			LimitingFactor:          string(rep.LimitingFactor),
-			MinCeilingRequiredFt:    rep.MinRequiredCeilingFt,
-			ActualCeilingFt:         rep.WorstCeilingFt,
-			CeilingMarginFt:         rep.CeilingMarginFt,
-			MinVisibilityRequiredSM: rep.MinRequiredVisSM,
-			ActualVisibilitySM:      rep.WorstVisibilitySM,
-			VisibilityMarginSM:      rep.VisMarginSM,
-			LegalRuleApplied:        rep.LegalRuleApplied,
-			Explanation:             rep.Explanation,
-		})
-	}
-}
 
 // E2ETestHarness encapsulates the complete offline gRPC and WebSocket execution environment.
 type E2ETestHarness struct {
 	T              *testing.T
 	NOAAClient     *noaa.WeatherFeedClient
-	Hub            *ws.Hub
+	Hub            *gateway.Hub
 	GRPCServer     *googlegrpc.Server
 	GRPCListener   *bufconn.Listener
 	GRPCClientConn *googlegrpc.ClientConn
@@ -77,14 +41,13 @@ type E2ETestHarness struct {
 func NewE2ETestHarness(t *testing.T) *E2ETestHarness {
 	// 1. Core NOAA Client & WebSocket Hub
 	feedClient := noaa.NewWeatherFeedClient()
-	hub := ws.NewHub()
+	hub := gateway.NewHub()
 	go hub.Run()
 
 	// 2. In-Memory gRPC Server (bufconn)
 	lis := bufconn.Listen(defaultBufSize)
 	grpcServer := googlegrpc.NewServer()
-	broadcaster := &harnessBroadcaster{hub: hub}
-	weatherService := grpc.NewWeatherServer(feedClient, broadcaster)
+	weatherService := grpc.NewWeatherServer(feedClient, hub)
 	pb.RegisterWeatherIngestServiceServer(grpcServer, weatherService)
 
 	go func() {
@@ -109,11 +72,7 @@ func NewE2ETestHarness(t *testing.T) *E2ETestHarness {
 	grpcClient := pb.NewWeatherIngestServiceClient(conn)
 
 	// 4. In-Memory WebSocket HTTP Server (httptest)
-	mux := http.NewServeMux()
-	mux.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
-		ws.ServeWs(hub, w, r)
-	})
-	httpServer := httptest.NewServer(mux)
+	httpServer := httptest.NewServer(gateway.NewHandler(hub, feedClient))
 	wsURL := "ws" + strings.TrimPrefix(httpServer.URL, "http") + "/ws"
 
 	return &E2ETestHarness{
@@ -140,14 +99,14 @@ func (h *E2ETestHarness) DialWebSocket() (*websocket.Conn, error) {
 }
 
 // ReadWSEvent reads and parses the next JSON event envelope from the WebSocket.
-func (h *E2ETestHarness) ReadWSEvent(conn *websocket.Conn, timeout time.Duration) (*ws.WSEvent, error) {
+func (h *E2ETestHarness) ReadWSEvent(conn *websocket.Conn, timeout time.Duration) (*gateway.ServerEnvelope, error) {
 	conn.SetReadDeadline(time.Now().Add(timeout))
 	_, msg, err := conn.ReadMessage()
 	if err != nil {
 		return nil, err
 	}
 
-	var evt ws.WSEvent
+	var evt gateway.ServerEnvelope
 	if err := json.Unmarshal(msg, &evt); err != nil {
 		return nil, fmt.Errorf("json unmarshal failed on msg %q: %w", string(msg), err)
 	}
@@ -155,7 +114,7 @@ func (h *E2ETestHarness) ReadWSEvent(conn *websocket.Conn, timeout time.Duration
 }
 
 // WriteClientMessage writes a JSON client message envelope to the WebSocket.
-func (h *E2ETestHarness) WriteClientMessage(conn *websocket.Conn, msg ws.ClientMessage) error {
+func (h *E2ETestHarness) WriteClientMessage(conn *websocket.Conn, msg gateway.ClientEnvelope) error {
 	conn.SetWriteDeadline(time.Now().Add(2 * time.Second))
 	return conn.WriteJSON(msg)
 }

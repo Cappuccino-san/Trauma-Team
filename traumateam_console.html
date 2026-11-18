@@ -6,185 +6,134 @@
   <title>TRAUMATEAM // HAA-135.L DISPATCH CONSOLE</title>
   <style>
     :root {
-      --bg: #030712;
-      --panel-bg: #0b1329;
-      --border: #1e293b;
-      --text: #f1f5f9;
-      --text-dim: #64748b;
-      --accent: #10b981;
-      --accent-glow: rgba(16, 185, 129, 0.2);
-      --cyan: #06b6d4;
-      --amber: #f59e0b;
-      --red: #ef4444;
+      --bg: #05080c;
+      --panel-bg: #0c0e12;
+      --elevated: #12151c;
+      --border: #1e232e;
+      --border-strong: #2d3545;
+      --text: #e6edf3;
+      --text-dim: #7d8590;
+      --accent: #00e676;
+      --cyan: #00e5ff;
+      --amber: #ffab00;
+      --red: #ff1744;
       --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
     }
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
       background: var(--bg);
       color: var(--text);
       font-family: var(--font-mono);
-      font-size: 13px;
-      line-height: 1.5;
+      font-size: 12px;
+      line-height: 1.45;
       height: 100vh;
       display: flex;
       flex-direction: column;
       overflow: hidden;
+      font-variant-numeric: tabular-nums;
     }
     header {
       background: var(--panel-bg);
-      border-bottom: 1px solid var(--border);
-      padding: 10px 16px;
+      border-bottom: 1px solid var(--border-strong);
+      padding: 8px 12px;
       display: flex;
       justify-content: space-between;
       align-items: center;
       flex-wrap: wrap;
-      gap: 12px;
+      gap: 10px;
     }
     .brand-title {
-      font-size: 14px;
-      font-weight: 700;
+      font-size: 13px;
+      font-weight: 800;
       letter-spacing: 0.08em;
-      color: var(--accent);
+      color: var(--text);
       display: flex;
       align-items: center;
       gap: 8px;
     }
     .badge {
       display: inline-block;
-      padding: 2px 8px;
-      font-size: 11px;
-      border-radius: 4px;
-      font-weight: 600;
+      padding: 2px 7px;
+      font-size: 10px;
+      font-weight: 700;
+      border: 1px solid var(--border-strong);
     }
-    .badge-online {
-      background: rgba(16, 185, 129, 0.15);
-      color: #34d399;
-      border: 1px solid rgba(16, 185, 129, 0.4);
-    }
-    .badge-offline {
-      background: rgba(239, 68, 68, 0.15);
-      color: #f87171;
-      border: 1px solid rgba(239, 68, 68, 0.4);
-    }
-    .badge-sim {
-      background: rgba(6, 182, 212, 0.15);
-      color: #38bdf8;
-      border: 1px solid rgba(6, 182, 212, 0.4);
-    }
-    .conn-bar {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
+    .badge-online { background: rgba(0, 230, 118, 0.12); color: var(--accent); border-color: var(--accent); }
+    .badge-offline { background: rgba(0, 229, 255, 0.08); color: var(--cyan); border-color: var(--cyan); }
+    .conn-bar { display: flex; align-items: center; gap: 6px; }
     input[type="text"] {
-      background: #020617;
-      border: 1px solid var(--border);
+      background: #05080c;
+      border: 1px solid var(--border-strong);
       color: var(--text);
-      padding: 6px 10px;
+      padding: 4px 8px;
       font-family: inherit;
-      font-size: 12px;
-      border-radius: 4px;
+      font-size: 11px;
     }
     button {
-      background: #1e293b;
+      background: var(--elevated);
       color: var(--text);
-      border: 1px solid #334155;
-      padding: 6px 12px;
+      border: 1px solid var(--border-strong);
+      padding: 4px 10px;
       font-family: inherit;
-      font-size: 12px;
+      font-size: 11px;
+      font-weight: 700;
       cursor: pointer;
-      border-radius: 4px;
-      transition: all 0.15s ease;
+      transition: background-color 80ms linear, border-color 80ms linear, transform 60ms linear;
+      text-align: left;
     }
-    button:hover {
-      background: #334155;
-      border-color: var(--accent);
-    }
+    button:hover { background: #1a202c; border-color: var(--cyan); }
+    button:active { transform: translateY(1px); }
     button.btn-accent {
-      background: #064e3b;
-      color: #6ee7b7;
-      border-color: #059669;
+      background: rgba(0, 230, 118, 0.14);
+      color: var(--accent);
+      border-color: var(--accent);
+      text-align: center;
     }
-    button.btn-accent:hover {
-      background: #047857;
-      color: #fff;
-    }
+    button.btn-accent:hover { background: var(--accent); color: #000; }
     main {
       flex: 1;
       display: grid;
-      grid-template-columns: 1fr 340px;
+      grid-template-columns: 1fr 370px;
       overflow: hidden;
     }
     .terminal-pane {
       display: flex;
       flex-direction: column;
-      border-right: 1px solid var(--border);
+      border-right: 1px solid var(--border-strong);
       overflow: hidden;
-      background: #020617;
+      background: #04060a;
     }
     .terminal-output {
       flex: 1;
       overflow-y: auto;
-      padding: 14px;
+      padding: 12px;
       display: flex;
       flex-direction: column;
-      gap: 4px;
+      gap: 3px;
     }
-    .terminal-output::-webkit-scrollbar {
-      width: 6px;
-    }
-    .terminal-output::-webkit-scrollbar-thumb {
-      background: #1e293b;
-    }
-    .log-line {
-      display: flex;
-      gap: 8px;
-      word-break: break-all;
-    }
-    .ts {
-      color: var(--text-dim);
-      flex-shrink: 0;
-    }
-    .log-cmd {
-      color: var(--cyan);
-      font-weight: 600;
-    }
-    .log-out {
-      color: #e2e8f0;
-    }
-    .log-pass {
-      color: #34d399;
-    }
-    .log-fail {
-      color: #f87171;
-    }
-    .log-warn {
-      color: #fbbf24;
-    }
+    .log-line { display: flex; gap: 8px; word-break: break-word; }
+    .ts { color: var(--text-dim); flex-shrink: 0; }
+    .log-cmd { color: var(--cyan); font-weight: 700; }
+    .log-out { color: #d0d7de; }
+    .log-pass { color: var(--accent); }
+    .log-fail { color: var(--red); }
+    .log-warn { color: var(--amber); }
     .terminal-input-bar {
-      border-top: 1px solid var(--border);
-      padding: 10px 14px;
+      border-top: 1px solid var(--border-strong);
+      padding: 8px 12px;
       display: flex;
       align-items: center;
       gap: 8px;
-      background: #090e1a;
+      background: var(--panel-bg);
     }
-    .prompt {
-      color: var(--accent);
-      font-weight: 700;
-      font-size: 14px;
-    }
+    .prompt { color: var(--accent); font-weight: 800; font-size: 13px; }
     .terminal-input {
       flex: 1;
       background: transparent;
       border: none;
       color: #fff;
       font-family: inherit;
-      font-size: 13px;
+      font-size: 12px;
       outline: none;
     }
     .sidebar {
@@ -192,59 +141,57 @@
       display: flex;
       flex-direction: column;
       overflow-y: auto;
-      border-left: 1px solid var(--border);
     }
     .sidebar-section {
-      padding: 14px;
+      padding: 10px 12px;
       border-bottom: 1px solid var(--border);
     }
     .sidebar-title {
-      font-size: 11px;
-      font-weight: 700;
+      font-size: 10px;
+      font-weight: 800;
       color: var(--text-dim);
-      letter-spacing: 0.05em;
-      margin-bottom: 8px;
+      letter-spacing: 0.08em;
+      margin-bottom: 7px;
       text-transform: uppercase;
     }
     .metric-grid {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 8px;
+      gap: 6px;
     }
     .metric-card {
-      background: #030712;
+      background: #05080c;
       border: 1px solid var(--border);
-      padding: 8px 10px;
-      border-radius: 4px;
+      padding: 6px 8px;
     }
-    .metric-label {
+    .metric-label { font-size: 9px; color: var(--text-dim); letter-spacing: 0.05em; }
+    .metric-val { font-size: 12px; font-weight: 800; color: var(--text); margin-top: 1px; }
+    .preset-btn-group { display: flex; flex-direction: column; gap: 5px; }
+    .advisory-box {
+      margin-top: 6px;
+      padding: 6px 8px;
+      background: rgba(255, 171, 0, 0.08);
+      border: 1px solid var(--amber);
+      color: var(--amber);
       font-size: 10px;
-      color: var(--text-dim);
-    }
-    .metric-val {
-      font-size: 14px;
       font-weight: 700;
-      color: #f8fafc;
-      margin-top: 2px;
+      display: none;
     }
-    .preset-btn-group {
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
+    @media (max-width: 900px) {
+      main { grid-template-columns: 1fr; grid-template-rows: 1fr auto; }
+      .sidebar { max-height: 45vh; border-top: 1px solid var(--border-strong); }
     }
   </style>
 </head>
 <body>
   <header>
     <div class="brand-title">
-      <span>TRAUMATEAM</span>
-      <span style="color:var(--text-dim)">//</span>
-      <span>DISPATCH CONSOLE</span>
-      <span id="connBadge" class="badge badge-offline">WS: DISCONNECTED</span>
+      <span>TRAUMATEAM // HAA-135.L</span>
+      <span id="connBadge" class="badge badge-offline">SIM // OFFLINE ORACLE</span>
     </div>
     <div class="conn-bar">
-      <input type="text" id="wsUrlInput" value="ws://localhost:8080/ws" style="width: 220px;" aria-label="Gateway WebSocket URL">
-      <button id="btnConnect" onclick="toggleConnect()">CONNECT</button>
+      <input type="text" id="wsUrlInput" value="ws://localhost:8080/ws" style="width: 205px;" aria-label="Gateway WebSocket URL">
+      <button id="btnConnect" onclick="toggleConnect()">LIVE WS</button>
       <button onclick="sendPing()">PING</button>
       <button onclick="clearConsole()">CLEAR</button>
     </div>
@@ -255,67 +202,247 @@
       <div class="terminal-output" id="terminalOutput">
         <div class="log-line">
           <span class="ts">[INIT]</span>
-          <span class="log-pass">TRAUMATEAM HAA-135.L INDEPENDENT DISPATCH CONSOLE INITIALIZED.</span>
+          <span class="log-pass">TRAUMATEAM HAA-135.L AIR-GAPPED CONSOLE READY (ICAO DOC 7488/3 + H145/BELL 429 RFM).</span>
         </div>
         <div class="log-line">
           <span class="ts">[INFO]</span>
-          <span class="log-out">Type 'help' for command list. Connected to Go Gateway &amp; Rust RFM Engine.</span>
+          <span class="log-out">Type 'help' or select a tactical preset on the right.</span>
         </div>
       </div>
       <form class="terminal-input-bar" onsubmit="handleCommand(event)">
         <span class="prompt">$</span>
-        <input type="text" id="cmdInput" class="terminal-input" placeholder="Type command (eval, get, sub, preset, ping, help)..." autocomplete="off" autofocus>
-        <button type="submit" class="btn-accent">SEND</button>
+        <input type="text" id="cmdInput" class="terminal-input" placeholder="eval | get <ICAO> | preset <go|highda|headwind|sigmet|ifr|marginal> | kinematics <H145|BELL429> [ELEV] [FUEL] [OAT] [HW]" autocomplete="off" autofocus>
+        <button type="submit" class="btn-accent">EXEC</button>
       </form>
     </div>
 
     <aside class="sidebar">
       <div class="sidebar-section">
-        <div class="sidebar-title">TELEMETRY &amp; WIRE STATE</div>
+        <div class="sidebar-title">TELEMETRY &amp; KINEMATICS</div>
         <div class="metric-grid">
-          <div class="metric-card">
-            <div class="metric-label">STATUS</div>
-            <div class="metric-val" id="metricStatus">OFFLINE</div>
-          </div>
-          <div class="metric-card">
-            <div class="metric-label">LAST SEQ</div>
-            <div class="metric-val" id="metricSeq">--</div>
-          </div>
-          <div class="metric-card">
-            <div class="metric-label">RTT LATENCY</div>
-            <div class="metric-val" id="metricRtt">--</div>
-          </div>
           <div class="metric-card">
             <div class="metric-label">VERDICT</div>
             <div class="metric-val" id="metricVerdict" style="color: var(--accent);">--</div>
           </div>
+          <div class="metric-card">
+            <div class="metric-label">AIRFRAME</div>
+            <div class="metric-val" id="metricAirframe">H145</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-label">PA / DA (FT)</div>
+            <div class="metric-val" id="metricAtm">--</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-label">GW / MTOW</div>
+            <div class="metric-val" id="metricGw">--</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-label">OGE MARGIN</div>
+            <div class="metric-val" id="metricOge">--</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-label">RESERVE MARGIN</div>
+            <div class="metric-val" id="metricRes">--</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-label">SEQ / RTT</div>
+            <div class="metric-val" id="metricWire">--</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-label">LONG CG (MM)</div>
+            <div class="metric-val" id="metricCg">--</div>
+          </div>
+        </div>
+        <div id="advisoryBox" class="advisory-box"></div>
+      </div>
+
+      <div class="sidebar-section">
+        <div class="sidebar-title">TACTICAL &amp; HEMS PRESETS</div>
+        <div class="preset-btn-group">
+          <button onclick="runCommand('preset go')">01 // GO: LOWLAND EXTRACTION (KAPA-KLXV)</button>
+          <button onclick="runCommand('preset highda')">02 // NO-GO: HIGH-DA OGE + DEFUEL (KLXV)</button>
+          <button onclick="runCommand('preset headwind')">03 // NO-GO: §135.209 HEADWIND BREACH</button>
+          <button onclick="runCommand('preset sigmet')">04 // NO-GO: CONVECTIVE SIGMET (KBOS-KPWM)</button>
+          <button onclick="runCommand('preset ifr')">05 // IFR_REQUIRED: §135.611 NIGHT (KASE)</button>
+          <button onclick="runCommand('preset marginal')">06 // CAUTION: NVG MARGINAL (KAPA-KDEN)</button>
         </div>
       </div>
 
       <div class="sidebar-section">
-        <div class="sidebar-title">SIMULATION PRESETS</div>
+        <div class="sidebar-title">RFM &amp; WEATHER PROBES</div>
         <div class="preset-btn-group">
-          <button onclick="runCommand('preset go')">01 // NOMINAL GO (KAPA-KLXV)</button>
-          <button onclick="runCommand('preset marginal')">02 // MARGINAL NVG (KAPA-KDEN)</button>
-          <button onclick="runCommand('preset nogo')">03 // NO-GO LOW IFR (KASE)</button>
-          <button onclick="runCommand('preset ifr')">04 // §135.611 IFR TRANSITION</button>
-          <button onclick="runCommand('preset sigmet')">05 // CONVECTIVE SIGMET (KBOS)</button>
-        </div>
-      </div>
-
-      <div class="sidebar-section">
-        <div class="sidebar-title">QUICK ACTIONS</div>
-        <div class="preset-btn-group">
+          <button onclick="runCommand('kinematics H145 9927 600 28 12')">H145 LEADVILLE HIGH-DA (DEFICIT)</button>
+          <button onclick="runCommand('kinematics BELL429 5434 320 15 10')">BELL 429 DENVER METRO (GO)</button>
+          <button onclick="runCommand('get KLXV')">GET METAR KLXV (9,927 FT)</button>
           <button onclick="runCommand('eval KAPA KLXV KASE')">EVAL KAPA-KLXV-KASE</button>
-          <button onclick="runCommand('get KLXV')">GET METAR KLXV</button>
-          <button onclick="runCommand('sub KAPA KDEN KLXV KASE')">SUB ALL STATIONS</button>
-          <button onclick="runCommand('kinematics H145 9934 400 3200')">KINEMATICS LEADVILLE</button>
         </div>
       </div>
     </aside>
   </main>
 
   <script>
+    // -------------------------------------------------------------------------
+    // Exact ICAO Doc 7488/3 Atmospheric Equations (mirrors ffi.rs & rfmPhysics.ts)
+    // -------------------------------------------------------------------------
+    const T0_K = 288.15;
+    const P0_PA = 101325.0;
+    const R_AIR = 287.05287;
+    const G0 = 9.80665;
+    const LAPSE_M = 0.0065;
+    const FT_TO_M = 0.3048;
+    const M_TO_FT = 3.280839895013123;
+    const LAPSE_FT = LAPSE_M * FT_TO_M;
+    const RHO0 = 1.225;
+    const STD_HPA = 1013.25;
+    const STD_INHG = 29.92126;
+
+    function computePaFt(elevFt, inhg) {
+      const qnhHpa = Number.isFinite(inhg) && inhg > 10 ? inhg * (STD_HPA / STD_INHG) : STD_HPA;
+      const exp = (R_AIR * LAPSE_M) / G0;
+      const t0OverL = (T0_K / LAPSE_M) * M_TO_FT;
+      return elevFt + t0OverL * (1.0 - Math.pow(qnhHpa / STD_HPA, exp));
+    }
+
+    function computeDaFt(paFt, oatC) {
+      const t0Ft = T0_K / LAPSE_FT;
+      const term = Math.max(0.01, 1.0 - paFt / t0Ft);
+      const power = G0 / (R_AIR * LAPSE_M);
+      const pPa = Math.pow(term, power) * P0_PA;
+      const tk = Math.max(100.0, oatC + 273.15);
+      const rho = pPa / (R_AIR * tk);
+      const dr = Math.max(0.001, rho / RHO0);
+      return t0Ft * (1.0 - Math.pow(dr, 1.0 / (power - 1.0)));
+    }
+
+    function interp1d(x, xs, ys) {
+      if (x <= xs[0]) return ys[0];
+      if (x >= xs[xs.length - 1]) return ys[ys.length - 1];
+      for (let i = 0; i < xs.length - 1; i++) {
+        if (x >= xs[i] && x <= xs[i + 1]) {
+          const t = (x - xs[i]) / (xs[i + 1] - xs[i] || 1);
+          return ys[i] + t * (ys[i + 1] - ys[i]);
+        }
+      }
+      return ys[ys.length - 1];
+    }
+
+    function interp2d(pa, oat, paGrid, oatGrid, table) {
+      let p0 = 0, p1 = 0, pt = 0;
+      if (pa >= paGrid[paGrid.length - 1]) { p0 = p1 = paGrid.length - 1; }
+      else if (pa > paGrid[0]) {
+        for (let i = 0; i < paGrid.length - 1; i++) {
+          if (pa >= paGrid[i] && pa <= paGrid[i + 1]) { p0 = i; p1 = i + 1; pt = (pa - paGrid[i]) / (paGrid[i + 1] - paGrid[i]); break; }
+        }
+      }
+      let o0 = 0, o1 = 0, ot = 0;
+      if (oat >= oatGrid[oatGrid.length - 1]) { o0 = o1 = oatGrid.length - 1; }
+      else if (oat > oatGrid[0]) {
+        for (let i = 0; i < oatGrid.length - 1; i++) {
+          if (oat >= oatGrid[i] && oat <= oatGrid[i + 1]) { o0 = i; o1 = i + 1; ot = (oat - oatGrid[i]) / (oatGrid[i + 1] - oatGrid[i]); break; }
+        }
+      }
+      const r1 = table[p0][o0] + ot * (table[p0][o1] - table[p0][o0]);
+      const r2 = table[p1][o0] + ot * (table[p1][o1] - table[p1][o0]);
+      return r1 + pt * (r2 - r1);
+    }
+
+    const OAT_GRID = [-20, -10, 0, 10, 20, 30, 40, 50];
+    const SPECS = {
+      H145: {
+        name: 'Airbus H145 (BK117 D-2)',
+        short: 'H145',
+        emptyKg: 2140, emptyLong: 3910, mtow: 3700, cap: 694,
+        fuelMass: [0, 150, 350, 550, 694], fuelLong: [3900, 3930, 3975, 4005, 4020],
+        envGw: [2000, 2800, 3400, 3700], envFwd: [3780, 3795, 3815, 3830], envAft: [4200, 4190, 4170, 4150],
+        paGrid: [-2000, 0, 2000, 4000, 6000, 8000, 10000, 12000, 14000],
+        oge: [
+          [3700, 3700, 3700, 3700, 3700, 3700, 3700, 3600],
+          [3700, 3700, 3700, 3700, 3700, 3700, 3620, 3480],
+          [3700, 3700, 3700, 3700, 3690, 3580, 3450, 3310],
+          [3700, 3700, 3700, 3660, 3530, 3400, 3260, 3130],
+          [3700, 3680, 3600, 3480, 3350, 3210, 3070, 2940],
+          [3620, 3520, 3410, 3290, 3160, 3020, 2880, 2750],
+          [3440, 3330, 3210, 3090, 2960, 2820, 2680, 2550],
+          [3240, 3120, 3000, 2870, 2740, 2610, 2470, 2340],
+          [3020, 2900, 2770, 2640, 2510, 2380, 2250, 2120]
+        ],
+        pilotArm: 2420, attArm: 3350, litArm: 3820, rackArm: 4280
+      },
+      BELL429: {
+        name: 'Bell 429 GlobalRanger',
+        short: 'BELL 429',
+        emptyKg: 2025, emptyLong: 3260, mtow: 3175, cap: 590,
+        fuelMass: [0, 200, 400, 590], fuelLong: [3320, 3340, 3360, 3380],
+        envGw: [1900, 2600, 3175], envFwd: [3120, 3140, 3170], envAft: [3480, 3470, 3450],
+        paGrid: [-2000, 0, 2000, 4000, 6000, 8000, 10000, 12000],
+        oge: [
+          [3175, 3175, 3175, 3175, 3175, 3175, 3175, 3080],
+          [3175, 3175, 3175, 3175, 3175, 3175, 3070, 2950],
+          [3175, 3175, 3175, 3175, 3120, 3020, 2900, 2780],
+          [3175, 3175, 3175, 3080, 2970, 2850, 2730, 2610],
+          [3175, 3110, 3030, 2920, 2800, 2680, 2560, 2440],
+          [3050, 2960, 2860, 2750, 2630, 2500, 2380, 2260],
+          [2880, 2790, 2680, 2570, 2450, 2320, 2200, 2080],
+          [2700, 2600, 2500, 2380, 2260, 2140, 2010, 1900]
+        ],
+        pilotArm: 2180, attArm: 3100, litArm: 3550, rackArm: 3900
+      }
+    };
+
+    const OFFLINE_METARS = {
+      KAPA: { elev: 5885, oat: 18, qnh: 29.95, vis: 10, ceil: 25000, cat: 'VFR', raw: 'KAPA 050550Z 18010KT 10SM SCT050 18/04 A2995 RMK AO2' },
+      KDEN: { elev: 5434, oat: 15, qnh: 30.10, vis: 10, ceil: 10000, cat: 'VFR', raw: 'KDEN 050550Z 28014KT 10SM BKN100 15/M05 A3010 RMK AO2' },
+      KLXV: { elev: 9927, oat: 28, qnh: 29.70, vis: 10, ceil: 25000, cat: 'VFR', raw: 'KLXV 050550Z 26012KT 10SM SCT080 28/02 A2970 RMK AO2' },
+      KASE: { elev: 7820, oat: 0, qnh: 29.85, vis: 2, ceil: 900, cat: 'IFR', raw: 'KASE 050550Z 34005KT 2SM OVC009 00/M01 A2985 RMK AO2' },
+      KBOS: { elev: 20, oat: 12, qnh: 29.98, vis: 10, ceil: 8000, cat: 'VFR', raw: 'KBOS 050554Z 24014KT 10SM FEW035 BKN080 12/04 A2998' },
+      KMHT: { elev: 266, oat: 10, qnh: 29.96, vis: 7, ceil: 4500, cat: 'VFR', raw: 'KMHT 050553Z 23009KT 7SM SCT025 BKN045 10/04 A2996' },
+      KPWM: { elev: 76, oat: 8, qnh: 29.94, vis: 4, ceil: 900, cat: 'IFR', raw: 'KPWM 050551Z 21011G18KT 4SM BR BKN009 OVC018 08/06 A2994' }
+    };
+
+    const PRESETS = {
+      go: { label: 'NOMINAL GO (KAPA-KDEN-KLXV)', verdict: 'APPROVED', color: 'var(--accent)', rule: '14 CFR § 135.609 Table 1 (Mountainous Day XC)', airframe: 'H145', elev: 5885, oat: 18, qnh: 29.95, fuel: 420, payload: 140, crew: 192, hw: 8, dist: 45, corridor: 'KAPA -> KDEN -> KLXV', detail: 'All stations >= 1000 ft / 3.0 SM; OGE hover & reserve margins nominal.' },
+      highda: { label: 'HIGH-DA OGE DEFICIT + DEFUEL (KLXV)', verdict: 'NO-GO', color: 'var(--red)', rule: 'RFM OGE Hover Ceiling @ 13,781 ft DA', airframe: 'H145', elev: 9927, oat: 28, qnh: 29.70, fuel: 580, payload: 210, crew: 192, hw: 12, dist: 38, corridor: 'KAPA -> KLXV', detail: 'Leadville KLXV 9,927 ft MSL @ 28C exceeds H145 OGE hover ceiling.' },
+      headwind: { label: 'HIGH-HEADWIND §135.209 BREACH', verdict: 'NO-GO', color: 'var(--red)', rule: '14 CFR § 135.209 (20-min VFR Fuel Reserve)', airframe: 'H145', elev: 5434, oat: 20, qnh: 29.92, fuel: 215, payload: 160, crew: 192, hw: 65, dist: 75, corridor: 'KDEN -> KCYS', detail: '65 kt headwind drops GS to 74 kt; landing fuel breaches 20-min VFR reserve.' },
+      sigmet: { label: 'CONVECTIVE SIGMET 22E (KBOS-KMHT-KPWM)', verdict: 'DISQUALIFIED', color: 'var(--red)', rule: 'FAA Safety Directive: Convective SIGMET 22E', airframe: 'H145', elev: 266, oat: 12, qnh: 29.94, fuel: 390, payload: 140, crew: 192, hw: 20, dist: 52, corridor: 'KBOS -> KMHT -> KPWM', detail: 'Corridor segment intersects Convective SIGMET 22E (tops FL450, hail 2 in, G60KT).' },
+      ifr: { label: '§135.611 IFR TRANSITION (KAPA-KLXV-KASE)', verdict: 'IFR_REQUIRED', color: 'var(--cyan)', rule: '14 CFR § 135.611 (HAA IFR w/ Alternate)', airframe: 'BELL429', elev: 7820, oat: 0, qnh: 29.85, fuel: 360, payload: 130, crew: 180, hw: 10, dist: 48, corridor: 'KAPA -> KLXV -> KASE', detail: 'KASE OVC009 / 2SM below VFR §135.609; cleared IFR under §135.611 with alternate.' },
+      marginal: { label: 'NVG MARGINAL CAUTION (KAPA-KDEN)', verdict: 'MARGINAL', color: 'var(--amber)', rule: '14 CFR § 135.609 Table 1 (Night Mtn NVG)', airframe: 'H145', elev: 5434, oat: 6, qnh: 29.98, fuel: 380, payload: 120, crew: 192, hw: 15, dist: 32, corridor: 'KAPA -> KDEN', detail: 'KDEN 1,100 ft AGL ceiling (+100 ft buffer inside 200 ft caution threshold).' },
+      nogo: { label: 'VFR BELOW MINIMUMS (KASE UNAIDED)', verdict: 'BELOW_MINIMUMS', color: 'var(--red)', rule: '14 CFR § 135.609 Table 1 (Mountainous Night)', airframe: 'H145', elev: 7820, oat: 0, qnh: 29.85, fuel: 380, payload: 140, crew: 192, hw: 10, dist: 45, corridor: 'KAPA -> KASE', detail: 'KASE 900 ft OVC / 2.0 SM below 1,000 ft / 3.0 SM requirement.' }
+    };
+
+    function evaluateOfflineKinematics(p) {
+      const s = SPECS[p.airframe] || SPECS.H145;
+      const pa = computePaFt(p.elev, p.qnh);
+      const da = computeDaFt(pa, p.oat);
+      const gw = s.emptyKg + p.fuel + p.payload + p.crew;
+      const fArm = interp1d(Math.min(s.cap, Math.max(0, p.fuel)), s.fuelMass, s.fuelLong);
+      const longCg = (s.emptyKg * s.emptyLong + p.fuel * fArm + (p.crew * 0.48) * s.pilotArm + (p.crew * 0.52) * s.attArm + (p.payload * 0.65) * s.litArm + (p.payload * 0.35) * s.rackArm) / gw;
+      const fwdLim = interp1d(gw, s.envGw, s.envFwd);
+      const aftLim = interp1d(gw, s.envGw, s.envAft);
+      const maxOge = Math.min(s.mtow, interp2d(pa, p.oat, s.paGrid, OAT_GRID, s.oge));
+      const ogeMargin = maxOge - gw;
+      const tas = s.short === 'H145'
+        ? 135 + (pa / 2000) * 1.5 - ((gw - 2500) / 1200) * 5 + (p.oat - 15) * 0.1
+        : 142 + (pa / 2000) * 1.8 - ((gw - 2200) / 975) * 6 + (p.oat - 15) * 0.1;
+      const ff = s.short === 'H145'
+        ? 210 + ((gw - 2500) / 1200) * 45 - (pa / 5000) * 8 + (p.oat / 50) * 6
+        : 195 + ((gw - 2200) / 975) * 40 - (pa / 5000) * 7 + (p.oat / 50) * 5;
+      const gs = Math.max(20, tas - p.hw);
+      const burn = (p.dist / gs) * ff;
+      const remFuel = p.fuel - burn;
+      const res20 = (20 / 60) * ff;
+      const resMargin = remFuel - res20;
+
+      let advisory = '';
+      if (gw > s.mtow || ogeMargin < 0) {
+        const excess = Math.ceil(gw - Math.min(s.mtow, maxOge));
+        advisory = `ACTIONABLE MITIGATION: DEFUEL / OFFLOAD ${excess} KG TO CLEAR ${gw > s.mtow ? 'MTOW' : 'OGE HOVER CEILING'}`;
+      } else if (resMargin < 0) {
+        advisory = `ACTIONABLE MITIGATION: REFUEL +${Math.ceil(-resMargin)} KG JET-A FOR 14 CFR § 135.209 20-MIN RESERVE`;
+      }
+
+      return { s, pa, da, gw, longCg, fwdLim, aftLim, maxOge, ogeMargin, tas, gs, ff, burn, remFuel, resMargin, advisory };
+    }
+
     let ws = null;
     let reqSeq = 0;
     let pingMap = new Map();
@@ -323,28 +450,46 @@
     const output = document.getElementById('terminalOutput');
     const cmdInput = document.getElementById('cmdInput');
     const connBadge = document.getElementById('connBadge');
-    const metricStatus = document.getElementById('metricStatus');
-    const metricSeq = document.getElementById('metricSeq');
-    const metricRtt = document.getElementById('metricRtt');
     const metricVerdict = document.getElementById('metricVerdict');
+    const metricAirframe = document.getElementById('metricAirframe');
+    const metricAtm = document.getElementById('metricAtm');
+    const metricGw = document.getElementById('metricGw');
+    const metricOge = document.getElementById('metricOge');
+    const metricRes = document.getElementById('metricRes');
+    const metricWire = document.getElementById('metricWire');
+    const metricCg = document.getElementById('metricCg');
+    const advisoryBox = document.getElementById('advisoryBox');
+
+    function updateTelemetryCards(verdictLabel, verdictColor, k) {
+      metricVerdict.textContent = verdictLabel;
+      metricVerdict.style.color = verdictColor;
+      metricAirframe.textContent = k.s.short;
+      metricAtm.textContent = `${Math.round(k.pa)} / ${Math.round(k.da)}`;
+      metricGw.textContent = `${Math.round(k.gw)} / ${k.s.mtow} kg`;
+      metricGw.style.color = k.gw > k.s.mtow ? 'var(--red)' : 'var(--text)';
+      metricOge.textContent = `${k.ogeMargin >= 0 ? '+' : ''}${Math.round(k.ogeMargin)} kg`;
+      metricOge.style.color = k.ogeMargin < 0 ? 'var(--red)' : 'var(--accent)';
+      metricRes.textContent = `${k.resMargin >= 0 ? '+' : ''}${Math.round(k.resMargin)} kg`;
+      metricRes.style.color = k.resMargin < 0 ? 'var(--red)' : 'var(--accent)';
+      metricCg.textContent = `${k.longCg.toFixed(0)} [${k.fwdLim.toFixed(0)}-${k.aftLim.toFixed(0)}]`;
+      if (k.advisory) {
+        advisoryBox.textContent = k.advisory;
+        advisoryBox.style.display = 'block';
+      } else {
+        advisoryBox.style.display = 'none';
+      }
+    }
 
     function log(type, text) {
       const now = new Date().toISOString().slice(11, 19);
       const row = document.createElement('div');
       row.className = 'log-line';
-
       const ts = document.createElement('span');
       ts.className = 'ts';
       ts.textContent = `[${now}]`;
-
       const body = document.createElement('span');
-      if (type === 'cmd') body.className = 'log-cmd';
-      else if (type === 'pass') body.className = 'log-pass';
-      else if (type === 'fail') body.className = 'log-fail';
-      else if (type === 'warn') body.className = 'log-warn';
-      else body.className = 'log-out';
+      body.className = type === 'cmd' ? 'log-cmd' : type === 'pass' ? 'log-pass' : type === 'fail' ? 'log-fail' : type === 'warn' ? 'log-warn' : 'log-out';
       body.textContent = text;
-
       row.appendChild(ts);
       row.appendChild(body);
       output.appendChild(row);
@@ -355,107 +500,73 @@
       if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) {
         ws.close();
       } else {
-        const url = document.getElementById('wsUrlInput').value.trim();
-        connect(url);
+        connect(document.getElementById('wsUrlInput').value.trim());
       }
     }
 
     function connect(url) {
-      log('out', `Connecting to WebSocket gateway at ${url}...`);
+      log('out', `Connecting to ${url}...`);
       connBadge.className = 'badge badge-offline';
       connBadge.textContent = 'WS: CONNECTING';
-      metricStatus.textContent = 'CONNECTING';
-
       try {
         ws = new WebSocket(url);
       } catch (e) {
-        log('fail', `Failed to initialize WebSocket: ${e.message}`);
-        connBadge.textContent = 'WS: ERROR';
-        metricStatus.textContent = 'ERROR';
+        log('fail', `WebSocket error: ${e.message}`);
         return;
       }
-
       ws.onopen = () => {
         connBadge.className = 'badge badge-online';
         connBadge.textContent = 'WS: CONNECTED';
-        metricStatus.textContent = 'ONLINE';
         document.getElementById('btnConnect').textContent = 'DISCONNECT';
-        log('pass', 'Connected to TraumaTeam WebSocket Gateway (:8080).');
-        sendJson({
-          action: 'SUBSCRIBE',
-          request_id: `sub-${Date.now()}`,
-          params: {
-            stations: ['KAPA', 'KDEN', 'KLXV', 'KASE'],
-            topics: ['minimums', 'hazards']
-          }
-        });
+        log('pass', 'Connected to TraumaTeam Go/Rust WebSocket Gateway.');
+        sendJson({ action: 'SUBSCRIBE', request_id: `sub-${Date.now()}`, params: { stations: ['KAPA', 'KDEN', 'KLXV', 'KASE', 'KBOS', 'KMHT', 'KPWM'], topics: ['minimums', 'hazards'] } });
       };
-
       ws.onmessage = (event) => {
-        try {
-          const envelope = JSON.parse(event.data);
-          handleServerEnvelope(envelope);
-        } catch (e) {
-          log('out', `< RAW: ${event.data}`);
-        }
+        try { handleServerEnvelope(JSON.parse(event.data)); } catch { log('out', `< RAW: ${event.data}`); }
       };
-
-      ws.onerror = (err) => {
-        log('fail', `WebSocket transport error observed.`);
-      };
-
+      ws.onerror = () => log('warn', 'Gateway unreachable; offline deterministic oracle remains active.');
       ws.onclose = () => {
         connBadge.className = 'badge badge-offline';
-        connBadge.textContent = 'WS: DISCONNECTED';
-        metricStatus.textContent = 'OFFLINE';
-        document.getElementById('btnConnect').textContent = 'CONNECT';
-        log('warn', 'WebSocket connection closed.');
+        connBadge.textContent = 'SIM // OFFLINE ORACLE';
+        document.getElementById('btnConnect').textContent = 'LIVE WS';
       };
     }
 
     function sendJson(payload) {
-      if (!ws || ws.readyState !== WebSocket.OPEN) {
-        log('warn', 'WebSocket not connected. Running command in local offline simulation mode.');
-        return false;
-      }
+      if (!ws || ws.readyState !== WebSocket.OPEN) return false;
       ws.send(JSON.stringify(payload));
       return true;
     }
 
     function handleServerEnvelope(env) {
-      if (env.seq) metricSeq.textContent = `#${env.seq}`;
-
-      if (env.event === 'PONG') {
-        const reqId = env.request_id;
-        if (pingMap.has(reqId)) {
-          const rtt = Date.now() - pingMap.get(reqId);
-          pingMap.delete(reqId);
-          metricRtt.textContent = `${rtt}ms`;
-          log('pass', `PONG received. Round-Trip Time (RTT): ${rtt}ms`);
-        }
+      if (env.seq) metricWire.textContent = `#${env.seq}`;
+      if (env.event === 'PONG' && pingMap.has(env.request_id)) {
+        const rtt = Date.now() - pingMap.get(env.request_id);
+        pingMap.delete(env.request_id);
+        metricWire.textContent = `${env.seq ? '#' + env.seq + ' / ' : ''}${rtt}ms`;
+        log('pass', `PONG RTT=${rtt}ms`);
       } else if (env.event === 'WEATHER_UPDATE' || env.event === 'WEATHER_SNAPSHOT') {
         const p = env.payload;
-        log('out', `[WEATHER] ${env.station_id}: ${p.flight_category || 'VFR'} | Wind ${p.wind_dir_deg}@${p.wind_speed_kts}kt | Vis ${p.visibility_sm}SM | Ceil ${p.ceiling_agl_ft}ft | QNH ${p.altimeter_inhg} | DA ${p.density_altitude_ft}ft`);
+        log('out', `[METAR] ${env.station_id}: ${p.flight_category} | Wind ${p.wind_dir_deg}@${p.wind_speed_kts}kt | Vis ${p.visibility_sm}SM | Ceil ${p.ceiling_agl_ft}ft | DA ${Math.round(p.density_altitude_ft)}ft`);
       } else if (env.event === 'MINIMUMS_EVALUATION') {
         const rep = env.payload;
-        metricVerdict.textContent = rep.verdict || (rep.is_compliant ? 'APPROVED' : 'NO-GO');
-        metricVerdict.style.color = rep.is_compliant ? 'var(--accent)' : 'var(--red)';
-        const style = rep.is_compliant ? 'pass' : 'fail';
-        log(style, `[VERDICT] ${rep.verdict} // Factor: ${rep.limiting_factor} // Rule: ${rep.legal_rule_applied}`);
-        log('out', `[DETAIL] Ceil: ${rep.worst_ceiling_ft}ft (req ${rep.min_required_ceiling_ft}ft) | Vis: ${rep.worst_visibility_sm}SM (req ${rep.min_required_vis_sm}SM)`);
-        if (rep.audit_trace && rep.audit_trace.length) {
-          rep.audit_trace.forEach(t => log('out', `  | ${t}`));
-        }
+        metricVerdict.textContent = rep.verdict;
+        metricVerdict.style.color = rep.verdict === 'APPROVED' ? 'var(--accent)' : rep.verdict === 'MARGINAL' ? 'var(--amber)' : rep.verdict === 'IFR_REQUIRED' ? 'var(--cyan)' : 'var(--red)';
+        log(rep.is_compliant ? 'pass' : 'fail', `[VERDICT] ${rep.verdict} // ${rep.limiting_factor} // ${rep.legal_rule_applied}`);
+        if (rep.audit_trace) rep.audit_trace.forEach((t) => log('out', `  | ${t}`));
       } else if (env.event === 'KINEMATICS_EVALUATION') {
         const k = env.payload;
-        log('pass', `[KINEMATICS] ${k.airframe}: GW=${k.mass_balance.gross_weight_kg.toFixed(0)}kg (Limit ${k.mass_balance.fwd_limit_mm.toFixed(0)}-${k.mass_balance.aft_limit_mm.toFixed(0)}mm) | TAS ${k.cruise_tas_kts.toFixed(1)}kt | OGE Margin +${k.oge_margin_kg.toFixed(0)}kg | Fuel Margin +${k.reserve_margin_kg.toFixed(0)}kg`);
-      } else if (env.event === 'HAZARD_ALERT') {
-        const h = env.payload;
-        log('fail', `[ALERT] ${h.hazard_type} (${h.severity}): ${h.summary}`);
+        const s = SPECS[k.airframe.includes('429') ? 'BELL429' : 'H145'];
+        updateTelemetryCards(k.verdict, k.verdict === 'GO' ? 'var(--accent)' : 'var(--red)', {
+          s, pa: k.pressure_altitude_ft, da: k.density_altitude_ft,
+          gw: k.mass_balance.gross_weight_kg, longCg: k.mass_balance.cg_long_mm,
+          fwdLim: k.mass_balance.fwd_limit_mm, aftLim: k.mass_balance.aft_limit_mm,
+          ogeMargin: k.oge_margin_kg, resMargin: k.reserve_margin_kg,
+          advisory: k.actionable_advisory || ''
+        });
+        log(k.is_feasible ? 'pass' : 'fail', `[RUST FFI] ${k.airframe}: ${k.verdict} (${k.limiting_factor}) | DA=${Math.round(k.density_altitude_ft)}ft | OGE=${k.oge_margin_kg.toFixed(1)}kg | Reserve=${k.reserve_margin_kg.toFixed(1)}kg`);
       } else if (env.event === 'ERROR') {
-        log('fail', `[SERVER ERROR] ${env.error}`);
-      } else {
-        log('out', `< [${env.event || 'EVENT'}] ${JSON.stringify(env.payload || env)}`);
+        log('fail', `[ERROR] ${env.error}`);
       }
     }
 
@@ -465,10 +576,8 @@
       pingMap.set(reqId, Date.now());
       log('cmd', `> PING (${reqId})`);
       if (!sendJson({ action: 'PING', request_id: reqId, timestamp: Date.now() })) {
-        setTimeout(() => {
-          metricRtt.textContent = '1ms (local)';
-          log('pass', `PONG received (local loopback simulator).`);
-        }, 15);
+        metricWire.textContent = '1ms (SIM)';
+        log('pass', 'PONG received (local offline loopback).');
       }
     }
 
@@ -482,6 +591,23 @@
       handleCommand(new Event('submit'));
     }
 
+    function runPreset(key) {
+      const p = PRESETS[key];
+      if (!p) return false;
+      const k = evaluateOfflineKinematics(p);
+      updateTelemetryCards(p.verdict, p.color, k);
+      log(p.verdict === 'APPROVED' ? 'pass' : p.verdict === 'MARGINAL' ? 'warn' : 'fail', `[PRESET:${key.toUpperCase()}] ${p.label} -> ${p.verdict}`);
+      log('out', `  | Corridor: ${p.corridor} | Rule: ${p.rule}`);
+      log('out', `  | ${p.detail}`);
+      log('out', `  | Kinematics (${k.s.short}): PA=${Math.round(k.pa)}ft DA=${Math.round(k.da)}ft | GW=${Math.round(k.gw)}/${k.s.mtow}kg | OGE Margin=${k.ogeMargin >= 0 ? '+' : ''}${Math.round(k.ogeMargin)}kg | Reserve Margin=${k.resMargin >= 0 ? '+' : ''}${Math.round(k.resMargin)}kg`);
+      if (k.advisory) log('warn', `  | ${k.advisory}`);
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        const parts = p.corridor.split('->').map((x) => x.trim());
+        sendJson({ action: 'EVALUATE_MINIMUMS', request_id: `preset-${++reqSeq}`, params: { corridor: { departure: parts[0], intermediates: parts.slice(1, -1), destination: parts[parts.length - 1] }, regulatory_context: { is_day: key !== 'ifr' && key !== 'marginal' && key !== 'nogo', is_mountainous: key !== 'sigmet', is_local: false, is_ifr_certified: key === 'ifr', has_ifr_alternate: key === 'ifr', has_severe_weather_radar: true, equipment: { nvg_equipped: true, htaws_equipped: true } } } });
+      }
+      return true;
+    }
+
     function handleCommand(e) {
       if (e) e.preventDefault();
       const raw = cmdInput.value.trim();
@@ -493,113 +619,81 @@
       const action = parts[0].toLowerCase();
 
       if (action === 'help') {
-        log('out', 'Available commands:');
-        log('out', '  eval [DEP] [INT...] [DEST]    : Evaluate corridor against 14 CFR § 135.609 minimums');
-        log('out', '  get <ICAO>                   : Request station METAR/TAF observation');
-        log('out', '  sub <ICAO...>                : Subscribe to real-time station weather stream');
-        log('out', '  unsub <ICAO...>              : Unsubscribe from station weather stream');
-        log('out', '  preset <go|marginal|nogo|ifr|sigmet> : Load pre-calibrated scenario preset');
-        log('out', '  kinematics [H145|BELL429] [ELEV] [FUEL] [GW] : Calculate RFM hover & CG envelope');
-        log('out', '  ping                         : Measure gateway WebSocket RTT latency');
-        log('out', '  clear                        : Clear console output');
+        log('out', 'Commands: preset <go|highda|headwind|sigmet|ifr|marginal|nogo> | kinematics <H145|BELL429> [ELEV] [FUEL] [OAT] [HW] | eval [DEP] [INT...] [DEST] | get <ICAO> | ping | clear');
       } else if (action === 'clear') {
         clearConsole();
       } else if (action === 'ping') {
         sendPing();
+      } else if (action === 'preset' && parts[1]) {
+        const k = parts[1].toLowerCase();
+        if (!runPreset(k)) log('fail', `Unknown preset "${k}". Valid: go, highda, headwind, sigmet, ifr, marginal, nogo`);
       } else if (action === 'get' && parts[1]) {
         const st = parts[1].toUpperCase();
-        reqSeq++;
-        const ok = sendJson({
-          action: 'GET_CONDITIONS',
-          request_id: `get-${reqSeq}`,
-          params: { station: st }
-        });
-        if (!ok) {
-          log('out', `[SIM GET] ${st}: 18008KT 10SM CLR 15/05 A2992 (Synthetic Local)`);
+        if (!sendJson({ action: 'GET_CONDITIONS', request_id: `get-${++reqSeq}`, params: { station: st } })) {
+          const m = OFFLINE_METARS[st];
+          if (m) {
+            const pa = computePaFt(m.elev, m.qnh);
+            const da = computeDaFt(pa, m.oat);
+            log('out', `[SIM METAR] ${st} (${m.cat}): ${m.raw} | PA=${Math.round(pa)}ft DA=${Math.round(da)}ft`);
+          } else {
+            log('warn', `[SIM METAR] ${st}: Station not in offline cache; fail-closed for corridor dispatch.`);
+          }
         }
-      } else if (action === 'sub' && parts.length > 1) {
-        const stations = parts.slice(1).map(s => s.toUpperCase());
-        reqSeq++;
-        sendJson({
-          action: 'SUBSCRIBE',
-          request_id: `sub-${reqSeq}`,
-          params: { stations, topics: ['minimums', 'hazards'] }
-        });
-        log('out', `Subscribed to stations: ${stations.join(', ')}`);
-      } else if (action === 'eval') {
-        let dep = 'KAPA', dest = 'KLXV', intermediates = [];
-        if (parts.length >= 3) {
-          dep = parts[1].toUpperCase();
-          dest = parts[parts.length - 1].toUpperCase();
-          intermediates = parts.slice(2, -1).map(s => s.toUpperCase());
-        }
-        reqSeq++;
+      } else if (action === 'kinematics') {
+        const af = (parts[1] || 'H145').toUpperCase().includes('429') ? 'BELL429' : 'H145';
+        const elev = parseFloat(parts[2]) || 5885;
+        const fuel = parseFloat(parts[3]) || 420;
+        const oat = Number.isFinite(parseFloat(parts[4])) ? parseFloat(parts[4]) : 18;
+        const hw = Number.isFinite(parseFloat(parts[5])) ? parseFloat(parts[5]) : 10;
         const sent = sendJson({
-          action: 'EVALUATE_MINIMUMS',
-          request_id: `eval-${reqSeq}`,
+          action: 'EVALUATE_KINEMATICS',
+          request_id: `kin-${++reqSeq}`,
           params: {
-            corridor: { departure: dep, destination: dest, intermediates },
-            regulatory_context: {
-              is_day: true,
-              is_mountainous: true,
-              is_local: false,
-              equipment: { nvg_equipped: true, htaws_equipped: true }
-            }
+            station: elev > 9000 ? 'KLXV' : 'KAPA',
+            kinematics: { airframe_id: af === 'BELL429' ? 1 : 0, station_elevation_ft: elev, true_course_deg: 270, leg_distance_nm: 45, fuel_weight_kg: fuel, payloads: [{ station_id: 0, weight_kg: 92 }, { station_id: af === 'BELL429' ? 4 : 2, weight_kg: 100 }, { station_id: 6, weight_kg: 140 }] }
           }
         });
         if (!sent) {
-          log('pass', `[OFFLINE EVAL] Corridor ${dep} -> ${intermediates.join(',') || 'DIRECT'} -> ${dest}`);
-          log('pass', `VERDICT: APPROVED // 14 CFR § 135.609 Table 1 Mountainous Day (NVG/HTAWS compliant)`);
+          const k = evaluateOfflineKinematics({ airframe: af, elev, oat, qnh: elev > 9000 ? 29.70 : 29.95, fuel, payload: 140, crew: 192, hw, dist: 45 });
+          const isGo = k.gw <= k.s.mtow && k.ogeMargin >= 0 && k.resMargin >= 0;
+          updateTelemetryCards(isGo ? 'GO' : 'NO-GO', isGo ? 'var(--accent)' : 'var(--red)', k);
+          log(isGo ? 'pass' : 'fail', `[OFFLINE RFM] ${k.s.name}: ${isGo ? 'GO' : 'NO-GO'} | PA=${Math.round(k.pa)}ft DA=${Math.round(k.da)}ft | GW=${Math.round(k.gw)}/${k.s.mtow}kg | OGE=${k.ogeMargin >= 0 ? '+' : ''}${Math.round(k.ogeMargin)}kg | Reserve=${k.resMargin >= 0 ? '+' : ''}${Math.round(k.resMargin)}kg`);
+          if (k.advisory) log('warn', `  | ${k.advisory}`);
         }
-      } else if (action === 'preset' && parts[1]) {
-        const p = parts[1].toLowerCase();
-        if (p === 'go') {
-          runCommand('eval KAPA KLXV');
-        } else if (p === 'marginal') {
-          runCommand('eval KAPA KDEN');
-        } else if (p === 'nogo') {
-          runCommand('eval KAPA KASE');
-        } else if (p === 'ifr') {
-          runCommand('eval KAPA KASE');
-        } else if (p === 'sigmet') {
-          runCommand('eval KBOS KMHT KPWM');
-        } else {
-          log('fail', `Unknown preset: ${p}. Valid: go, marginal, nogo, ifr, sigmet`);
-        }
-      } else if (action === 'kinematics') {
-        const airframe = (parts[1] || 'H145').toUpperCase().includes('BELL') ? 1 : 0;
-        const elev = parseFloat(parts[2]) || 5885;
-        const fuel = parseFloat(parts[3]) || 400;
-        reqSeq++;
-        sendJson({
-          action: 'EVALUATE_KINEMATICS',
-          request_id: `kin-${reqSeq}`,
-          params: {
-            station: 'KAPA',
-            kinematics: {
-              airframe_id: airframe,
-              station_elevation_ft: elev,
-              true_course_deg: 270.0,
-              leg_distance_nm: 45.0,
-              fuel_weight_kg: fuel,
-              payloads: [
-                { station_id: 0, weight_kg: 85.0 },
-                { station_id: 2, weight_kg: 80.0 },
-                { station_id: 6, weight_kg: 90.0 }
-              ]
+      } else if (action === 'eval') {
+        const deps = parts.length >= 3 ? parts.slice(1).map((s) => s.toUpperCase()) : ['KAPA', 'KLXV'];
+        const sent = sendJson({
+          action: 'EVALUATE_MINIMUMS',
+          request_id: `eval-${++reqSeq}`,
+          params: { corridor: { departure: deps[0], intermediates: deps.slice(1, -1), destination: deps[deps.length - 1] }, regulatory_context: { is_day: true, is_mountainous: true, is_local: false, equipment: { nvg_equipped: true, htaws_equipped: true } } }
+        });
+        if (!sent) {
+          if (deps.includes('KBOS') || deps.includes('KMHT') || deps.includes('KPWM')) runPreset('sigmet');
+          else if (deps.includes('KASE')) runPreset('nogo');
+          else {
+            const unknown = deps.filter((s) => !OFFLINE_METARS[s]);
+            if (unknown.length > 0) {
+              metricVerdict.textContent = 'DISQUALIFIED';
+              metricVerdict.style.color = 'var(--red)';
+              log('fail', `[FAIL-CLOSED] Missing METAR for [${unknown.join(', ')}] -> DISQUALIFIED under 14 CFR § 135.609 / § 135.611.`);
+            } else {
+              runPreset('go');
             }
           }
-        });
+        }
       } else {
         try {
           const parsed = JSON.parse(raw);
           sendJson(parsed);
-          log('out', `Raw JSON dispatched to gateway.`);
-        } catch (e) {
-          log('fail', `Unrecognized command "${parts[0]}". Type 'help' for command syntax or submit raw JSON envelope.`);
+          log('out', 'Raw JSON dispatched.');
+        } catch {
+          log('fail', `Unrecognized command "${parts[0]}". Type 'help'.`);
         }
       }
     }
+
+    // Boot into Nominal GO state immediately
+    runPreset('go');
   </script>
 </body>
 </html>

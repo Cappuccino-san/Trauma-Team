@@ -56,15 +56,15 @@ func EvaluateMinimums(obs *models.METAR, isDay, isMountainous, isLocal, nvgOrHta
 	verdict := "GO"
 	var explanation string
 
-	legalCite := fmt.Sprintf("14 CFR § 135.615 Table 1 [%s - %s]", rule.Category, rule.Condition)
+	legalCite := fmt.Sprintf("14 CFR § 135.609 Table 1 [%s - %s]", rule.Category, rule.Condition)
 
 	if !ceilOK {
-		limitingFactor = "FAR_135_615_CEILING_BELOW_MINIMUMS"
+		limitingFactor = string(models.LimitFAR135609CeilingBelowMinimums)
 		verdict = "NO-GO"
 		explanation = fmt.Sprintf("Observed ceiling (%.0f ft AGL) is below required minimum (%.0f ft AGL) by %.0f ft under %s",
 			actualCeil, rule.MinCeilingFt, -ceilMargin, legalCite)
 	} else if !visOK {
-		limitingFactor = "FAR_135_615_VISIBILITY_BELOW_MINIMUMS"
+		limitingFactor = string(models.LimitFAR135609VisBelowMinimums)
 		verdict = "NO-GO"
 		explanation = fmt.Sprintf("Observed visibility (%.1f SM) is below required minimum (%.1f SM) by %.1f SM under %s",
 			obs.VisibilitySM, rule.MinVisibilitySM, -visMargin, legalCite)

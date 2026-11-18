@@ -43,11 +43,17 @@ def pressure_altitude_ft(
     
     If neither altimeter_inhg nor qnh_hpa is provided, assumes standard 29.92 inHg / 1013.25 hPa.
     """
+    if not math.isfinite(geometric_altitude_ft):
+        raise ValueError(f"Invalid geometric altitude: {geometric_altitude_ft}")
+
     if qnh_hpa is None:
         if altimeter_inhg is not None:
             qnh_hpa = altimeter_inhg * INHG_TO_HPA
         else:
             qnh_hpa = STD_SEA_LEVEL_PRESSURE_HPA
+
+    if not math.isfinite(qnh_hpa) or qnh_hpa <= 0.0:
+        raise ValueError(f"Invalid barometric pressure: {qnh_hpa}")
 
     if exact_barometric:
         # ICAO Standard Geopotential Pressure Formula:
@@ -78,6 +84,12 @@ def density_altitude_ft(
     Density altitude is the single most critical aerodynamic governor for helicopter hover performance,
     directly defining rotor blade stall margins and turboshaft power available.
     """
+    if not math.isfinite(pressure_altitude_ft) or not math.isfinite(oat_c):
+        raise ValueError(f"Invalid non-finite atmosphere inputs: PA={pressure_altitude_ft}, OAT={oat_c}")
+    tk = celsius_to_kelvin(oat_c)
+    if tk <= 0.0:
+        raise ValueError(f"OAT below absolute zero: {oat_c} C")
+
     isa_c = isa_temperature_c(pressure_altitude_ft)
     delta_isa = oat_c - isa_c
 
@@ -95,7 +107,6 @@ def density_altitude_ft(
     pressure_pa = delta_press * P0_PA
 
     # 2. Local air density: rho = P / (R * T_K)
-    tk = celsius_to_kelvin(oat_c)
     rho = pressure_pa / (R_AIR * tk)
 
     # 3. Altitude in ISA having density rho:
@@ -110,6 +121,10 @@ def density_altitude_ft(
 
 def speed_of_sound_knots(oat_c: float) -> float:
     """Speed of sound in knots as a function of temperature."""
+    if not math.isfinite(oat_c):
+        raise ValueError(f"Invalid non-finite OAT: {oat_c}")
     tk = celsius_to_kelvin(oat_c)
+    if tk <= 0.0:
+        raise ValueError(f"OAT below absolute zero: {oat_c} C")
     a_mps = math.sqrt(GAMMA_AIR * R_AIR * tk)
     return a_mps * (3600.0 / 1852.0)

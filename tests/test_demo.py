@@ -54,7 +54,7 @@ def test_scenario_3_convective_sigmet_ceiling_bust():
     assert res.passed is True
     assert res.actual_verdict == DispatchVerdict.NO_GO.value
     assert res.actual_limiting_factor == LimitingFactor.FAR_135_615_CEILING_BELOW_MINIMUMS.value
-    assert "14 CFR § 135.615" in res.evaluation.limiting_description
+    assert "14 CFR § 135.609" in res.evaluation.limiting_description
     assert "400 ft" in res.evaluation.limiting_description
 
 

@@ -431,3 +431,62 @@ def test_ifr_fuel_reserves_and_mid_mission_fuel_exhaustion(dispatch_engine):
     assert res.verdict == DispatchVerdict.NO_GO
     assert res.limiting_factor == LimitingFactor.IFR_RESERVE_VIOLATION
     assert res.landing_reserve_fuel_kg < 0.0
+
+
+def test_nan_inf_and_boundary_safety_guards(dispatch_engine):
+    """Verifies NaN/Inf/non-physical guards across kinematics, atmosphere, fuel reserves, and empty-leg missions."""
+    from traumateam.core.atmosphere import pressure_altitude_ft, density_altitude_ft, speed_of_sound_knots
+
+    # 1. Wind triangle rejects NaN, Inf, negative wind speed, and exact crosswind == TAS
+    for bad_res in [
+        solve_wind_triangle(180.0, float("nan"), WindVector(180.0, 10.0)),
+        solve_wind_triangle(float("nan"), 130.0, WindVector(180.0, 10.0)),
+        solve_wind_triangle(180.0, 130.0, WindVector(float("inf"), 10.0)),
+        solve_wind_triangle(180.0, 130.0, WindVector(180.0, -5.0)),
+        solve_wind_triangle(360.0, 120.0, WindVector(90.0, 120.0)),
+    ]:
+        assert bad_res.is_flyable is False
+        assert bad_res.groundspeed_kts == 0.0
+
+    # 2. Atmosphere guards NaN/Inf and non-physical pressures/temperatures
+    with pytest.raises(ValueError):
+        pressure_altitude_ft(float("nan"), altimeter_inhg=29.92)
+    with pytest.raises(ValueError):
+        pressure_altitude_ft(5000.0, altimeter_inhg=0.0)
+    with pytest.raises(ValueError):
+        density_altitude_ft(5000.0, oat_c=float("nan"))
+    with pytest.raises(ValueError):
+        density_altitude_ft(5000.0, oat_c=-273.15)
+    with pytest.raises(ValueError):
+        speed_of_sound_knots(-273.15)
+
+    # 3. Fuel reserves fail closed on NaN or non-positive fuel flow
+    bad_fuel_rep = evaluate_fuel_reserves(remaining_fuel_kg=150.0, cruise_fuel_flow_kg_hr=0.0)
+    assert bad_fuel_rep.is_faa_legal is False
+    assert bad_fuel_rep.verdict == DispatchVerdict.NO_GO
+    bad_nan_rep = evaluate_fuel_reserves(remaining_fuel_kg=float("nan"), cruise_fuel_flow_kg_hr=220.0)
+    assert bad_nan_rep.is_faa_legal is False
+    assert bad_nan_rep.verdict == DispatchVerdict.NO_GO
+
+    # 4. Mission integrator rejects NaN initial fuel and handles empty legs without UnboundLocalError
+    weather = CorridorWeather(departure_metar=_nominal_metar("KAPA"))
+    nan_fuel_mission = MissionProfile(
+        mission_id="NAN_FUEL",
+        tail_number="N145TT",
+        initial_fuel_kg=float("nan"),
+        payloads=[],
+        legs=[],
+    )
+    with pytest.raises(ValueError, match="Invalid initial fuel weight"):
+        dispatch_engine.evaluate_mission("H145", nan_fuel_mission, weather)
+
+    empty_legs_mission = MissionProfile(
+        mission_id="EMPTY_LEGS",
+        tail_number="N145TT",
+        initial_fuel_kg=300.0,
+        payloads=[PayloadItem(item_id="p1", name="Pilot", station_id="PILOT_RH", weight_kg=85.0)],
+        legs=[],
+    )
+    empty_res = dispatch_engine.evaluate_mission("H145", empty_legs_mission, weather)
+    assert empty_res.verdict == DispatchVerdict.GO
+    assert empty_res.legs == []

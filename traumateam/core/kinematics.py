@@ -79,6 +79,27 @@ def solve_wind_triangle(
     Returns:
       WindTriangleResult with True Heading, Groundspeed, WCA, and wind components.
     """
+    if (
+        not math.isfinite(true_course_deg)
+        or not math.isfinite(tas_kts)
+        or not math.isfinite(wind.direction_deg)
+        or not math.isfinite(wind.speed_kts)
+        or wind.speed_kts < 0.0
+    ):
+        safe_tc = true_course_deg if math.isfinite(true_course_deg) else 0.0
+        safe_tas = tas_kts if math.isfinite(tas_kts) else 0.0
+        return WindTriangleResult(
+            true_course_deg=safe_tc,
+            true_heading_deg=safe_tc,
+            wind_correction_angle_deg=0.0,
+            tas_kts=safe_tas,
+            groundspeed_kts=0.0,
+            headwind_component_kts=0.0,
+            crosswind_component_kts=0.0,
+            is_flyable=False,
+            unflyable_reason="Invalid non-finite wind triangle input or negative wind speed.",
+        )
+
     if tas_kts <= 0:
         return WindTriangleResult(
             true_course_deg=true_course_deg,
@@ -103,9 +124,9 @@ def solve_wind_triangle(
     # Headwind component (positive means blowing in aircraft face, decreasing GS)
     headwind = wind.speed_kts * math.cos(alpha_rad)
 
-    # Check if crosswind exceeds TAS (physically impossible to hold track)
+    # Check if crosswind equals or exceeds TAS (physically impossible to hold track)
     sin_wca = crosswind / tas_kts
-    if abs(sin_wca) > 1.0:
+    if abs(sin_wca) >= 1.0:
         return WindTriangleResult(
             true_course_deg=true_course_deg,
             true_heading_deg=true_course_deg,

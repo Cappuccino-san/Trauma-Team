@@ -55,6 +55,31 @@ export interface MissionKinematicsEvaluation {
   reserve_fuel_20min_kg: number;
   reserve_margin_kg: number;
   mass_balance: MassBalanceEvaluation;
+  landing_gross_weight_kg?: number;
+  landing_cg_long_mm?: number;
+  landing_cg_lat_mm?: number;
+  zero_fuel_weight_kg?: number;
+  zero_fuel_cg_long_mm?: number;
+  zero_fuel_cg_lat_mm?: number;
+  ige_hover_ceiling_ft?: number;
+  oge_hover_ceiling_ft?: number;
+  oei_cat_a_ceiling_ft?: number;
+  required_fuel_offload_kg?: number;
+  required_payload_reduction_kg?: number;
+  additional_fuel_required_kg?: number;
+  actionable_advisory?: string;
+}
+
+export interface KinematicsPreset {
+  airframe: string;
+  fieldElevFt: number;
+  oatC: number;
+  qnhInHg: number;
+  fuelKg: number;
+  payloadKg: number;
+  crewKg: number;
+  headwindKts: number;
+  legDistanceNm?: number;
 }
 
 export const defaultKinematics: MissionKinematicsEvaluation = {
@@ -63,49 +88,63 @@ export const defaultKinematics: MissionKinematicsEvaluation = {
   limiting_factor: 'NONE',
   is_feasible: true,
   is_wind_flyable: true,
-  pressure_altitude_ft: 5885,
-  density_altitude_ft: 6840,
+  pressure_altitude_ft: 5858,
+  density_altitude_ft: 6827,
   max_ige_hover_weight_kg: 3700,
-  max_oge_hover_weight_kg: 3450,
-  max_oei_cat_a_weight_kg: 3050,
-  ige_margin_kg: 810,
-  oge_margin_kg: 560,
-  oei_cat_a_margin_kg: 160,
-  cruise_tas_kts: 135.5,
-  cruise_fuel_flow_kg_hr: 215.0,
-  hover_oge_fuel_flow_kg_hr: 258.0,
-  loiter_fuel_flow_kg_hr: 182.5,
-  groundspeed_kts: 128.0,
+  max_oge_hover_weight_kg: 3437,
+  max_oei_cat_a_weight_kg: 3015,
+  ige_margin_kg: 808,
+  oge_margin_kg: 545,
+  oei_cat_a_margin_kg: 123,
+  cruise_tas_kts: 138.1,
+  cruise_fuel_flow_kg_hr: 217.5,
+  hover_oge_fuel_flow_kg_hr: 261.0,
+  loiter_fuel_flow_kg_hr: 184.9,
+  groundspeed_kts: 130.1,
   true_heading_deg: 268.0,
   wind_correction_angle_deg: -2.0,
-  headwind_component_kts: 10.0,
+  headwind_component_kts: 8.0,
   crosswind_component_kts: -5.0,
-  leg_ete_minutes: 21.0,
-  leg_fuel_burn_kg: 75.0,
-  remaining_fuel_kg: 375.0,
-  reserve_fuel_20min_kg: 71.7,
-  reserve_margin_kg: 303.3,
+  leg_ete_minutes: 20.8,
+  leg_fuel_burn_kg: 75.2,
+  remaining_fuel_kg: 344.8,
+  reserve_fuel_20min_kg: 72.5,
+  reserve_margin_kg: 272.3,
+  landing_gross_weight_kg: 2816.8,
+  landing_cg_long_mm: 3860.4,
+  landing_cg_lat_mm: -13.9,
+  zero_fuel_weight_kg: 2472.0,
+  zero_fuel_cg_long_mm: 3844.5,
+  zero_fuel_cg_lat_mm: -15.8,
+  ige_hover_ceiling_ft: 14000,
+  oge_hover_ceiling_ft: 10912,
+  oei_cat_a_ceiling_ft: 6858,
+  required_fuel_offload_kg: 0,
+  required_payload_reduction_kg: 0,
+  additional_fuel_required_kg: 0,
+  actionable_advisory: '',
   mass_balance: {
     is_gw_compliant: true,
     is_long_cg_compliant: true,
     is_lat_cg_compliant: true,
     is_overall_compliant: true,
     limiting_factor: 'NONE',
-    gross_weight_kg: 2890,
-    cg_long_mm: 3864,
+    gross_weight_kg: 2892,
+    cg_long_mm: 3863.8,
     cg_lat_mm: -13.5,
-    fwd_limit_mm: 3796.7,
-    aft_limit_mm: 4188.3,
-    left_limit_mm: -80.0,
-    right_limit_mm: 80.0,
-    fwd_margin_mm: 67.3,
-    aft_margin_mm: 324.3,
-    left_margin_mm: 66.5,
-    right_margin_mm: 93.5
+    fwd_limit_mm: 3798.1,
+    aft_limit_mm: 4186.9,
+    left_limit_mm: -79.7,
+    right_limit_mm: 79.7,
+    fwd_margin_mm: 65.7,
+    aft_margin_mm: 323.1,
+    left_margin_mm: 66.2,
+    right_margin_mm: 93.2
   }
 };
 
 export const latestKinematics = writable<MissionKinematicsEvaluation>(defaultKinematics);
+export const kinematicsPresetStore = writable<KinematicsPreset | null>(null);
 
 export const currentGrossWeight = derived(latestKinematics, ($k) => $k.mass_balance.gross_weight_kg);
 export const currentCgLong = derived(latestKinematics, ($k) => $k.mass_balance.cg_long_mm);

@@ -1,4 +1,4 @@
-"""Tests for FAA Regulations: 14 CFR § 135.615 and § 135.209."""
+"""Tests for FAA Regulations: 14 CFR § 135.609 Table 1 and § 135.209."""
 
 import pytest
 from traumateam.regulations.far135_615 import (
@@ -9,7 +9,7 @@ from traumateam.regulations.fuel_reserves import evaluate_fuel_reserves
 from traumateam.models.verdict import LimitingFactor, DispatchVerdict
 
 def test_far_135_615_complete_matrix():
-    """Validates every legal cell in 14 CFR § 135.615 Table 1."""
+    """Validates every legal cell in 14 CFR § 135.609 Table 1."""
 
     # 1. Non-mountainous local
     # Day without NVG/HTAWS: 800-2; with NVG/HTAWS: 500-2
@@ -80,3 +80,16 @@ def test_far_135_209_fuel_reserve_evaluation():
     assert rep_nogo.limiting_factor == LimitingFactor.FAR_135_209_VFR_RESERVE_VIOLATION
     assert rep_nogo.is_faa_legal is False
     assert rep_nogo.reserve_margin_kg < 0.0
+
+
+def test_far_135_609_citation_alignment():
+    rep = evaluate_far_135_615_compliance(
+        observed_ceiling_ft=600.0,
+        observed_vis_sm=4.0,
+        is_day=True,
+        is_mountainous=True,
+        is_local=False,
+        nvg_or_htaws_equipped=True,
+    )
+    assert "14 CFR § 135.609 Table 1" in rep.legal_rule_applied
+    assert "14 CFR § 135.609 Table 1" in rep.explanation

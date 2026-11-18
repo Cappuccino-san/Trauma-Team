@@ -5,6 +5,7 @@ shifted CG envelope compliance, wind-corrected groundspeed, and local density al
 """
 
 from __future__ import annotations
+import math
 from datetime import datetime, timezone
 from typing import List, Dict, Optional, Tuple
 import numpy as np
@@ -62,6 +63,13 @@ class MissionSimulationIntegrator:
         ambient_temp_c: float = 15.0,
     ) -> DispatchEvaluation:
         """Executes the full deterministic multi-leg mission kinematic simulation."""
+        if not math.isfinite(mission.initial_fuel_kg) or mission.initial_fuel_kg < 0.0:
+            raise ValueError(f"Invalid initial fuel weight: {mission.initial_fuel_kg}")
+        if not math.isfinite(altimeter_inhg) or altimeter_inhg <= 0.0:
+            raise ValueError(f"Invalid altimeter setting: {altimeter_inhg}")
+        if not math.isfinite(ambient_temp_c) or ambient_temp_c <= -273.15:
+            raise ValueError(f"Invalid ambient temperature: {ambient_temp_c}")
+
         timestamp_utc = datetime.now(timezone.utc).isoformat()
         audit_trace: List[str] = []
         mitigation_actions: List[str] = []
@@ -102,6 +110,19 @@ class MissionSimulationIntegrator:
             excess_fuel = current_fuel_kg - self.airframe.fuel_system.usable_fuel_capacity_kg
             limiting_description = f"Fuel planned ({current_fuel_kg:.1f} kg) exceeds usable fuel capacity ({self.airframe.fuel_system.usable_fuel_capacity_kg:.1f} kg) by {excess_fuel:.1f} kg."
             mitigation_actions.append(f"Defuel aircraft by at least {excess_fuel:.1f} kg.")
+
+        # Baseline mass & balance state in case mission.legs is empty
+        mb_end = compute_mass_and_balance(
+            self.airframe,
+            max(0.0, current_fuel_kg),
+            self._get_active_payloads(mission.payloads, 0),
+        )
+        if not mission.legs and not mb_end.is_overall_compliant:
+            audit_trace.append(f"MB VIOLATION at mission initialization: {mb_end.detail_message}")
+            if overall_verdict != DispatchVerdict.NO_GO:
+                overall_verdict = DispatchVerdict.NO_GO
+                primary_limiting_factor = mb_end.limiting_factor
+                limiting_description = mb_end.detail_message
 
         # 2. Iterate sequentially through each leg
         for leg in mission.legs:
@@ -175,10 +196,12 @@ class MissionSimulationIntegrator:
                 # Solve wind triangle
                 wt = solve_wind_triangle(true_course, tas_kts, wind_at_alt)
                 if not wt.is_flyable:
-                    overall_verdict = DispatchVerdict.NO_GO
-                    primary_limiting_factor = LimitingFactor.UNFLYABLE_WIND
-                    limiting_description = wt.unflyable_reason or "Unflyable wind conditions"
-                    audit_trace.append(f"WIND TRIANGLE FAILURE: {limiting_description}")
+                    reason = wt.unflyable_reason or "Unflyable wind conditions"
+                    if overall_verdict != DispatchVerdict.NO_GO:
+                        overall_verdict = DispatchVerdict.NO_GO
+                        primary_limiting_factor = LimitingFactor.UNFLYABLE_WIND
+                        limiting_description = reason
+                    audit_trace.append(f"WIND TRIANGLE FAILURE: {reason}")
                     gs_kts = 1.0  # Avoid div by zero in reporting
                 else:
                     gs_kts = wt.groundspeed_kts

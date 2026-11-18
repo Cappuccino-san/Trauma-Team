@@ -1,6 +1,7 @@
 """FAA 14 CFR § 135.209 Fuel Reserve Regulations & Operator Contingency Engine."""
 
 from __future__ import annotations
+import math
 from dataclasses import dataclass
 from traumateam.models.verdict import LimitingFactor, DispatchVerdict
 
@@ -31,6 +32,28 @@ def evaluate_fuel_reserves(
     If between FAA statutory minimum and higher company safety policy (e.g., 30 min) -> CAUTION.
     """
     statutory_min = faa_vfr_min if is_vfr else faa_ifr_min
+
+    if (
+        not math.isfinite(remaining_fuel_kg)
+        or not math.isfinite(cruise_fuel_flow_kg_hr)
+        or cruise_fuel_flow_kg_hr <= 0.0
+    ):
+        limiting_factor = LimitingFactor.FAR_135_209_VFR_RESERVE_VIOLATION if is_vfr else LimitingFactor.IFR_RESERVE_VIOLATION
+        safe_rem = remaining_fuel_kg if math.isfinite(remaining_fuel_kg) else 0.0
+        return FuelReserveReport(
+            required_reserve_min=statutory_min,
+            required_reserve_kg=0.0,
+            remaining_fuel_kg=safe_rem,
+            reserve_margin_kg=-abs(safe_rem) if safe_rem != 0.0 else -1.0,
+            reserve_margin_min=-statutory_min,
+            is_faa_legal=False,
+            verdict=DispatchVerdict.NO_GO,
+            limiting_factor=limiting_factor,
+            detail_message=(
+                f"FUEL RESERVE VIOLATION (14 CFR § 135.209): Invalid telemetry "
+                f"(remaining_fuel_kg={remaining_fuel_kg}, cruise_fuel_flow_kg_hr={cruise_fuel_flow_kg_hr})."
+            ),
+        )
     
     # Fuel flow per minute
     fuel_per_min = cruise_fuel_flow_kg_hr / 60.0

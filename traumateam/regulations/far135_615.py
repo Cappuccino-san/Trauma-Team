@@ -1,6 +1,7 @@
-"""FAA 14 CFR § 135.615 VFR Flight Minimums for Helicopter Air Ambulance (HAA).
+"""FAA 14 CFR § 135.609 VFR Flight Minimums for Helicopter Air Ambulance (HAA).
 
-Implements the complete deterministic legal matrix from 14 CFR Part 135 Subpart L Table 1.
+Implements the complete deterministic legal matrix from 14 CFR § 135.609 Table 1
+(Part 135 Subpart L), reserving § 135.615 for VFR flight planning and obstacle clearance.
 """
 
 from __future__ import annotations
@@ -34,7 +35,7 @@ def get_far_135_615_minimums(
     is_local: bool,
     nvg_or_htaws_equipped: bool
 ) -> WeatherMinimumRule:
-    """Evaluates 14 CFR § 135.615 Table 1 to determine required ceiling and visibility."""
+    """Evaluates 14 CFR § 135.609 Table 1 to determine required ceiling and visibility."""
     
     if not is_mountainous:
         if is_local:
@@ -79,7 +80,7 @@ def evaluate_far_135_615_compliance(
     is_local: bool,
     nvg_or_htaws_equipped: bool
 ) -> WeatherComplianceReport:
-    """Evaluates observed ceiling and visibility against 14 CFR § 135.615 minimums."""
+    """Evaluates observed ceiling and visibility against 14 CFR § 135.609 Table 1 minimums."""
     rule = get_far_135_615_minimums(is_day, is_mountainous, is_local, nvg_or_htaws_equipped)
     
     ceil_margin = observed_ceiling_ft - rule.min_ceiling_ft
@@ -104,7 +105,7 @@ def evaluate_far_135_615_compliance(
             f"Observed visibility ({observed_vis_sm:.1f} SM) is below required minimum ({rule.min_visibility_sm:.1f} SM) by {abs(vis_margin):.1f} SM."
         )
 
-    legal_cite = f"14 CFR § 135.615 Table 1 [{rule.category} - {rule.condition}]"
+    legal_cite = f"14 CFR § 135.609 Table 1 [{rule.category} - {rule.condition}]"
     if not explanation_parts:
         explanation = f"Weather complies with {legal_cite}: Ceiling margin +{ceil_margin:.0f} ft, Vis margin +{vis_margin:.1f} SM."
     else:

@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"traumateam/weather_ingest/pkg/gateway"
 	"traumateam/weather_ingest/pkg/models"
 	"traumateam/weather_ingest/pkg/pb"
 )
@@ -204,8 +205,8 @@ func TestTier3_GRPC_WebSocket_DualServingSynchronization(t *testing.T) {
 	if err != nil {
 		t.Fatalf("WebSocket failed to receive event dispatched by gRPC call: %v", err)
 	}
-	if evt.Type != "METAR_UPDATE" {
-		t.Errorf("expected METAR_UPDATE, got %s", evt.Type)
+	if evt.Event != gateway.EventWeatherUpdate {
+		t.Errorf("expected %s, got %s", gateway.EventWeatherUpdate, evt.Event)
 	}
 	payload, ok := evt.Payload.(map[string]interface{})
 	if !ok || payload["station_id"] != "KAPA" {
