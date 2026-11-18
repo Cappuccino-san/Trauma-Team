@@ -6,7 +6,7 @@
 [![Rust 1.85+](https://img.shields.io/badge/rust-1.85+-DEA584.svg?logo=rust&logoColor=white)](https://www.rust-lang.org/)
 [![Go 1.24+](https://img.shields.io/badge/go-1.24+-00ADD8.svg?logo=go&logoColor=white)](https://go.dev/)
 [![Svelte 5](https://img.shields.io/badge/svelte-5.0-FF3E00.svg?logo=svelte&logoColor=white)](https://svelte.dev/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![License: All Rights Reserved](https://img.shields.io/badge/License-All_Rights_Reserved-lightgrey.svg)](LICENSE)
 [![FAA Part 135 Compliant](https://img.shields.io/badge/FAA-14_CFR_Part_135_Subpart_L-0A3A60.svg)](https://www.ecfr.gov/current/title-14/chapter-I/subchapter-G/part-135/subpart-L)
 
 **TraumaTeam** is an aviation flight operations engineering and dispatch decision engine purpose-built for Helicopter Emergency Medical Services (HEMS) operating under **FAA 14 CFR Part 135 Subpart L** (§§ 135.601–135.621), Part 91, and Part 135 Subpart D.
@@ -243,10 +243,10 @@ TraumaTeam includes a pytest + Hypothesis test suite and interactive benchmark s
 
 ---
 
-## Community Governance & Standards
+## Governance, Licensing & Standards
 
-TraumaTeam is maintained as an open-source safety-critical project:
-- [LICENSE](LICENSE): Standard MIT License (Copyright 2026 Trauma-Team Contributors).
+TraumaTeam is proprietary software governed by the following repository standards:
+- [LICENSE](LICENSE): Proprietary License — Copyright (c) 2026 TraumaTeam (Cappuccino-san). All Rights Reserved.
 - [CONTRIBUTING.md](CONTRIBUTING.md): Developer guide, local environment configuration, multi-language test invocation, and PR procedures.
 - [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md): Contributor Covenant v2.1.
 - [SECURITY.md](SECURITY.md): Vulnerability reporting policy for aviation safety-critical algorithms.

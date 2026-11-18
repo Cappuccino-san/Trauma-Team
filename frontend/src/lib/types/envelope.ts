@@ -310,4 +310,10 @@ export interface ServerEnvelope<T = unknown> {
   error?: string;
 }
 
-export type ConnectionState = 'DISCONNECTED' | 'CONNECTING' | 'CONNECTED' | 'RECONNECTING' | 'ERROR';
+export type ConnectionState =
+  | 'STATIC_SIM'
+  | 'DISCONNECTED'
+  | 'CONNECTING'
+  | 'CONNECTED'
+  | 'RECONNECTING'
+  | 'ERROR';

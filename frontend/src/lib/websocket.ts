@@ -12,7 +12,7 @@ import {
 } from './types/envelope';
 import { ingestWeatherEnvelope, ingestHazardEnvelope } from './stores/weather';
 import { ingestMinimumsEnvelope, isEvaluating } from './stores/verdict';
-import { ingestKinematicsEnvelope } from './stores/kinematics';
+import { ingestKinematicsEnvelope, kinematicsPresetStore } from './stores/kinematics';
 
 /**
  * Svelte WebSocket Router & Demultiplexer (`websocket.ts`)
@@ -48,6 +48,21 @@ export interface WebSocketRouterOptions {
   webSocketFactory?: (url: string) => WebSocket;
 }
 
+export interface ConnectOptions {
+  userInitiated?: boolean;
+  autoReconnect?: boolean;
+}
+
+/**
+ * Returns true when running from a static hosting origin (e.g., GitHub Pages or file://)
+ * where no live `/ws` Go telemetry gateway exists on `window.location.host`.
+ */
+export function isStaticHostingEnvironment(): boolean {
+  if (typeof window === 'undefined') return false;
+  const host = window.location.hostname.toLowerCase();
+  return host.endsWith('.github.io') || window.location.protocol === 'file:';
+}
+
 function appendLog(entry: EnvelopeLogEntry): void {
   envelopeStreamLog.update((logs) => [entry, ...logs].slice(0, 60));
 }
@@ -55,6 +70,7 @@ function appendLog(entry: EnvelopeLogEntry): void {
 export class TraumaTeamWebSocketRouter {
   private ws: WebSocket | null = null;
   private url: string;
+  private defaultAutoReconnect: boolean;
   private autoReconnect: boolean;
   private maxReconnectDelayMs: number;
   private heartbeatIntervalMs: number;
@@ -70,12 +86,13 @@ export class TraumaTeamWebSocketRouter {
 
   constructor(options: WebSocketRouterOptions = {}) {
     const defaultUrl =
-      typeof window !== 'undefined'
+      typeof window !== 'undefined' && !isStaticHostingEnvironment()
         ? `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws`
         : 'ws://localhost:8080/ws';
 
     this.url = options.url ?? defaultUrl;
-    this.autoReconnect = options.autoReconnect ?? true;
+    this.defaultAutoReconnect = options.autoReconnect ?? false;
+    this.autoReconnect = this.defaultAutoReconnect;
     this.maxReconnectDelayMs = options.maxReconnectDelayMs ?? 10000;
     this.heartbeatIntervalMs = options.heartbeatIntervalMs ?? 15000;
     this.webSocketFactory = options.webSocketFactory ?? ((u: string) => new WebSocket(u));
@@ -86,23 +103,50 @@ export class TraumaTeamWebSocketRouter {
     return `${prefix}-${this.reqCounter}`;
   }
 
-  public connect(customUrl?: string): void {
+  public enterStaticSimMode(): void {
+    this.autoReconnect = false;
+    this.reconnectAttempts = 0;
+    this.clearTimers();
+    if (this.ws) {
+      this.ws.onopen = null;
+      this.ws.onmessage = null;
+      this.ws.onerror = null;
+      this.ws.onclose = null;
+      this.ws.close();
+      this.ws = null;
+    }
+    lastGatewayError.set(null);
+    connectionState.set('STATIC_SIM');
+  }
+
+  public connect(customUrl?: string, connectOptions: ConnectOptions = {}): void {
+    const userInitiated = connectOptions.userInitiated ?? false;
+    if (isStaticHostingEnvironment() && !userInitiated) {
+      this.enterStaticSimMode();
+      return;
+    }
+
     if (customUrl) {
       this.url = customUrl;
     }
-    this.autoReconnect = true;
+    this.autoReconnect = connectOptions.autoReconnect ?? this.defaultAutoReconnect;
     this.clearTimers();
 
     if (this.ws && (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING)) {
       return;
     }
 
+    let hasOpened = false;
     connectionState.set(this.reconnectAttempts > 0 ? 'RECONNECTING' : 'CONNECTING');
     lastGatewayError.set(null);
 
     try {
       this.ws = this.webSocketFactory(this.url);
     } catch (err) {
+      if (!userInitiated && !this.autoReconnect) {
+        this.enterStaticSimMode();
+        return;
+      }
       connectionState.set('ERROR');
       lastGatewayError.set(err instanceof Error ? err.message : 'WebSocket initialization failed');
       this.scheduleReconnect();
@@ -110,6 +154,7 @@ export class TraumaTeamWebSocketRouter {
     }
 
     this.ws.onopen = () => {
+      hasOpened = true;
       this.reconnectAttempts = 0;
       connectionState.set('CONNECTED');
       this.startHeartbeat();
@@ -127,17 +172,22 @@ export class TraumaTeamWebSocketRouter {
     };
 
     this.ws.onerror = () => {
+      if (!userInitiated && !hasOpened) {
+        return;
+      }
       lastGatewayError.set('WebSocket transport error');
     };
 
     this.ws.onclose = () => {
       this.stopHeartbeat();
       this.ws = null;
-      if (this.autoReconnect) {
+      if (!userInitiated && !hasOpened && !this.autoReconnect) {
+        this.enterStaticSimMode();
+      } else if (this.autoReconnect) {
         connectionState.set('RECONNECTING');
         this.scheduleReconnect();
       } else {
-        connectionState.set('DISCONNECTED');
+        connectionState.set(isStaticHostingEnvironment() ? 'STATIC_SIM' : 'DISCONNECTED');
       }
     };
   }
@@ -150,7 +200,7 @@ export class TraumaTeamWebSocketRouter {
       this.ws.close();
       this.ws = null;
     }
-    connectionState.set('DISCONNECTED');
+    connectionState.set(isStaticHostingEnvironment() ? 'STATIC_SIM' : 'DISCONNECTED');
   }
 
   /**
@@ -531,4 +581,5 @@ export function resetRouterStores(): void {
   subscribedTopics.set([]);
   lastGatewayError.set(null);
   envelopeStreamLog.set([]);
+  kinematicsPresetStore.set(null);
 }

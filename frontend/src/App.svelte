@@ -8,7 +8,7 @@
   import RouteMap from './lib/components/RouteMap.svelte';
   import CgEnvelope from './lib/components/CgEnvelope.svelte';
   import CustomPresetModal from './lib/components/CustomPresetModal.svelte';
-  import { wsRouter } from './lib/websocket';
+  import { wsRouter, isStaticHostingEnvironment } from './lib/websocket';
   import { loadSimulationScenario } from './lib/simulation/fixtures';
 
   let showCustomModal = false;
@@ -17,9 +17,11 @@
   onMount(() => {
     // Load initial deterministic NOAA AWC & FAA 14 CFR Part 135 Subpart L simulation state
     loadSimulationScenario(wsRouter, 'NOMINAL_GO');
-    // Connect to the live Go WebSocket Gateway (:8080/ws) unless hosted on static GitHub Pages
-    if (typeof window !== 'undefined' && !window.location.hostname.endsWith('.github.io')) {
-      wsRouter.connect();
+    // Connect to the live Go WebSocket Gateway (:8080/ws) unless hosted in static simulation mode
+    if (isStaticHostingEnvironment()) {
+      wsRouter.enterStaticSimMode();
+    } else {
+      wsRouter.connect(undefined, { userInitiated: false });
     }
   });
 </script>

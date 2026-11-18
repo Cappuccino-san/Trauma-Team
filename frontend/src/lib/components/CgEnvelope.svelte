@@ -2,13 +2,20 @@
   import { onMount } from 'svelte';
   import {
     latestKinematics,
+    kinematicsPresetStore,
     currentGrossWeight,
     currentCgLong,
     currentCgLat,
-    isCgCompliant
+    isCgCompliant,
+    type KinematicsPreset
   } from '../stores/kinematics';
   import { wsRouter, connectionState } from '../websocket';
   import { activeCorridor } from '../stores/verdict';
+  import {
+    H145_SPEC,
+    BELL429_SPEC,
+    evaluateLocalMissionKinematics
+  } from '../rfmPhysics';
 
   // Interactive Kinematics & Mass/Balance Sliders
   let airframe = 'Airbus H145 (BK117 D-2)';
@@ -19,15 +26,20 @@
   let fuelKg = 420;
   let payloadKg = 140;
   let crewKg = 192;
+  let headwindKts = 8;
+  let legDistanceNm = 45;
+  let lastAppliedPreset: KinematicsPreset | null = null;
 
   $: isH145 = airframe.includes('H145');
+  $: activeSpec = isH145 ? H145_SPEC : BELL429_SPEC;
   $: gwMin = isH145 ? 1800 : 1700;
   $: gwMax = isH145 ? 3800 : 3300;
   $: longMin = isH145 ? 3700 : 3050;
   $: longMax = isH145 ? 4250 : 3550;
-  $: mtowDisplay = isH145 ? 3700 : 3175;
-  $: gwTicks = isH145 ? [2000, 2500, 3000, 3500] : [1800, 2200, 2600, 3000];
-  $: longTicks = isH145 ? [3800, 3900, 4000, 4100, 4200] : [3100, 3200, 3300, 3400, 3500];
+  $: mtowDisplay = activeSpec.mtowKg;
+  $: gwTicks = activeSpec.axisBounds.gwTicks;
+  $: longTicks = activeSpec.axisBounds.longTicks;
+  $: isKinematicsCompliant = $isCgCompliant && $latestKinematics.is_feasible;
 
   // ViewBox bounds for SVG canvas
   const WIDTH = 340;
@@ -45,33 +57,7 @@
     return HEIGHT - PAD_Y - ((gwKg - minKg) / (maxKg - minKg)) * PLOT_H;
   }
 
-  // Certified OEM H145 (BK117 D-2) and Bell 429 GlobalRanger CG envelopes (matching crates/traumateam_rfm)
-  const H145_ENVELOPE = [
-    { gw: 2000, fwd: 3780, aft: 4200, lat: 85 },
-    { gw: 2800, fwd: 3795, aft: 4190, lat: 80 },
-    { gw: 3400, fwd: 3815, aft: 4170, lat: 78 },
-    { gw: 3700, fwd: 3830, aft: 4150, lat: 75 }
-  ];
-
-  const BELL429_ENVELOPE = [
-    { gw: 1900, fwd: 3120, aft: 3480, lat: 70 },
-    { gw: 2600, fwd: 3140, aft: 3470, lat: 68 },
-    { gw: 3175, fwd: 3170, aft: 3450, lat: 65 }
-  ];
-
-  function interp1d(x: number, xs: number[], ys: number[]): number {
-    if (x <= xs[0]) return ys[0];
-    if (x >= xs[xs.length - 1]) return ys[ys.length - 1];
-    for (let i = 0; i < xs.length - 1; i++) {
-      if (x >= xs[i] && x <= xs[i + 1]) {
-        const t = (x - xs[i]) / (xs[i + 1] - xs[i]);
-        return ys[i] + t * (ys[i + 1] - ys[i]);
-      }
-    }
-    return ys[ys.length - 1];
-  }
-
-  $: activeEnvelope = isH145 ? H145_ENVELOPE : BELL429_ENVELOPE;
+  $: activeEnvelope = activeSpec.cgEnvelope;
 
   $: envelopePointsSvg = (() => {
     const fwdPath = activeEnvelope.map(
@@ -89,125 +75,41 @@
   $: aftLimitDisplay = $latestKinematics.mass_balance.aft_limit_mm || (isH145 ? 4200 : 3480);
   $: cgProgressPct = Math.max(0, Math.min(100, (($currentCgLong - fwdLimitDisplay) / (aftLimitDisplay - fwdLimitDisplay || 1)) * 100));
 
+  function applyPresetValues(preset: KinematicsPreset) {
+    lastAppliedPreset = preset;
+    airframe = preset.airframe;
+    fieldElevFt = preset.fieldElevFt;
+    oatC = preset.oatC;
+    qnhInHg = preset.qnhInHg;
+    fuelKg = preset.fuelKg;
+    payloadKg = preset.payloadKg;
+    crewKg = preset.crewKg;
+    headwindKts = preset.headwindKts;
+    legDistanceNm = preset.legDistanceNm ?? 45;
+  }
+
   function recalculateInteractiveKinematics() {
-    // 1. Atmospheric State (ICAO Standard Atmosphere)
-    const p0 = 29.9213;
-    const pa = fieldElevFt + 145442.156 * (1.0 - Math.pow(qnhInHg / p0, 0.190263));
-    const isaTempC = 15.0 - 1.98 * (pa / 1000.0);
-    const da = pa + 118.8 * (oatC - isaTempC);
-
-    // 2. Mass & CG Envelope (OEM Airbus H145 / Bell 429 matching Rust crates/traumateam_rfm)
-    const h145Selected = airframe.includes('H145');
-    const emptyWeight = h145Selected ? 2140.0 : 2025.0;
-    const emptyLongArm = h145Selected ? 3910.0 : 3260.0;
-    const emptyLatArm = h145Selected ? -5.0 : -3.0;
-    const mtow = h145Selected ? 3700.0 : 3175.0;
-    const minFlightWeight = h145Selected ? 1900.0 : 1800.0;
-
-    // Split crewKg across Pilot RH + Attendant LH, and payloadKg across Primary Litter + Medical Rack
-    const pilotKg = crewKg * 0.48;
-    const attendantKg = crewKg * 0.52;
-    const litterKg = payloadKg * 0.65;
-    const rackKg = payloadKg * 0.35;
-
-    const pilotLongArm = h145Selected ? 2420.0 : 2180.0;
-    const pilotLatArm = h145Selected ? 360.0 : 330.0;
-    const attLongArm = h145Selected ? 3350.0 : 3100.0;
-    const attLatArm = h145Selected ? -420.0 : -400.0;
-    const litterLongArm = h145Selected ? 3820.0 : 3550.0;
-    const litterLatArm = h145Selected ? -280.0 : -250.0;
-    const rackLongArm = h145Selected ? 4280.0 : 3900.0;
-    const rackLatArm = h145Selected ? 380.0 : 350.0;
-
-    const fuelArm = h145Selected
-      ? interp1d(fuelKg, [0, 150, 350, 550, 694], [3900, 3930, 3975, 4005, 4020])
-      : interp1d(fuelKg, [0, 200, 400, 590], [3320, 3340, 3360, 3380]);
-
-    const totalGW = emptyWeight + fuelKg + payloadKg + crewKg;
-    const longMoment =
-      emptyWeight * emptyLongArm +
-      fuelKg * fuelArm +
-      pilotKg * pilotLongArm +
-      attendantKg * attLongArm +
-      litterKg * litterLongArm +
-      rackKg * rackLongArm;
-    const longCG = longMoment / totalGW;
-
-    const latMoment =
-      emptyWeight * emptyLatArm +
-      pilotKg * pilotLatArm +
-      attendantKg * attLatArm +
-      litterKg * litterLatArm +
-      rackKg * rackLatArm;
-    const latCG = latMoment / totalGW;
-
-    const envPoints = h145Selected ? H145_ENVELOPE : BELL429_ENVELOPE;
-    const envWeights = envPoints.map((p) => p.gw);
-    const fwdLimit = interp1d(totalGW, envWeights, envPoints.map((p) => p.fwd));
-    const aftLimit = interp1d(totalGW, envWeights, envPoints.map((p) => p.aft));
-    const latLimit = interp1d(totalGW, envWeights, envPoints.map((p) => p.lat));
-    const leftLimit = -latLimit;
-    const rightLimit = latLimit;
-
-    const isGwOk = totalGW >= minFlightWeight && totalGW <= mtow;
-    const isLongOk = longCG >= fwdLimit && longCG <= aftLimit;
-    const isLatOk = latCG >= leftLimit && latCG <= rightLimit;
-    const isCompliant = isGwOk && isLongOk && isLatOk;
-
-    // 3. Dynamic RFM Cruise TAS, Fuel Flow & ETE (matching h145.rs & bell429.rs 3D cruise formulas)
-    const cruiseTasKts = h145Selected
-      ? 135.0 + (pa / 2000.0) * 1.5 - ((totalGW - 2500.0) / 1200.0) * 5.0 + (oatC - 15.0) * 0.1
-      : 142.0 + (pa / 2000.0) * 1.8 - ((totalGW - 2200.0) / 975.0) * 6.0 + (oatC - 15.0) * 0.1;
-
-    const cruiseFfKgHr = h145Selected
-      ? 210.0 + ((totalGW - 2500.0) / 1200.0) * 45.0 - (pa / 5000.0) * 8.0 + (oatC / 50.0) * 6.0
-      : 195.0 + ((totalGW - 2200.0) / 975.0) * 40.0 - (pa / 5000.0) * 7.0 + (oatC / 50.0) * 5.0;
-
-    const legDistanceNm = 45.0;
-    const groundspeedKts = Math.max(40.0, cruiseTasKts - 8.0);
-    const legEteMinutes = (legDistanceNm / groundspeedKts) * 60.0;
-    const legFuelBurnKg = (legEteMinutes / 60.0) * cruiseFfKgHr;
-    const remainingFuelKg = Math.max(0.0, fuelKg - legFuelBurnKg);
-    const reserve20MinKg = (20.0 / 60.0) * cruiseFfKgHr;
-
-    latestKinematics.update((prev) => ({
-      ...prev,
+    const evaluated = evaluateLocalMissionKinematics({
       airframe,
-      verdict: isCompliant && remainingFuelKg >= reserve20MinKg ? 'GO' : 'NO-GO',
-      is_feasible: isCompliant && remainingFuelKg >= reserve20MinKg,
-      pressure_altitude_ft: pa,
-      density_altitude_ft: da,
-      cruise_tas_kts: cruiseTasKts,
-      cruise_fuel_flow_kg_hr: cruiseFfKgHr,
-      groundspeed_kts: groundspeedKts,
-      leg_ete_minutes: legEteMinutes,
-      leg_fuel_burn_kg: legFuelBurnKg,
-      remaining_fuel_kg: remainingFuelKg,
-      reserve_fuel_20min_kg: reserve20MinKg,
-      reserve_margin_kg: remainingFuelKg - reserve20MinKg,
-      mass_balance: {
-        ...prev.mass_balance,
-        is_gw_compliant: isGwOk,
-        is_long_cg_compliant: isLongOk,
-        is_lat_cg_compliant: isLatOk,
-        is_overall_compliant: isCompliant,
-        gross_weight_kg: totalGW,
-        cg_long_mm: longCG,
-        cg_lat_mm: latCG,
-        fwd_limit_mm: fwdLimit,
-        aft_limit_mm: aftLimit,
-        left_limit_mm: leftLimit,
-        right_limit_mm: rightLimit,
-        fwd_margin_mm: longCG - fwdLimit,
-        aft_margin_mm: aftLimit - longCG,
-        left_margin_mm: latCG - leftLimit,
-        right_margin_mm: rightLimit - latCG
-      }
-    }));
+      fieldElevFt,
+      oatC,
+      qnhInHg,
+      fuelKg,
+      payloadKg,
+      crewKg,
+      headwindKts,
+      legDistanceNm
+    });
+    latestKinematics.set(evaluated);
 
-    // 4. When connected to live Go/Rust C-FFI gateway, also dispatch EVALUATE_KINEMATICS
+    // When connected to live Go/Rust C-FFI gateway, also dispatch EVALUATE_KINEMATICS
     if ($connectionState === 'CONNECTED') {
+      const h145Selected = airframe.includes('H145');
       const airframeId = h145Selected ? 0 : 1;
+      const pilotKg = crewKg * 0.48;
+      const attendantKg = crewKg * 0.52;
+      const litterKg = payloadKg * 0.65;
+      const rackKg = payloadKg * 0.35;
       const payloads = h145Selected
         ? [
             { station_id: 0, weight_kg: pilotKg },
@@ -236,7 +138,15 @@
     }
   }
 
+  $: if ($kinematicsPresetStore && $kinematicsPresetStore !== lastAppliedPreset) {
+    applyPresetValues($kinematicsPresetStore);
+    recalculateInteractiveKinematics();
+  }
+
   onMount(() => {
+    if ($kinematicsPresetStore) {
+      applyPresetValues($kinematicsPresetStore);
+    }
     recalculateInteractiveKinematics();
   });
 </script>
@@ -247,8 +157,12 @@
       <span>02 // ATMOSPHERE, MASS &amp; CG ENVELOPE (OEM AIRBUS H145 / BELL 429)</span>
       <span class="airframe-badge">{isH145 ? 'AIRBUS H145' : 'BELL 429'}</span>
     </div>
-    <span class="cg-status" class:compliant={$isCgCompliant} class:violation={!$isCgCompliant}>
-      {$isCgCompliant ? 'COMPLIANT (IN LIMITS)' : 'EXCEEDED (NO-GO)'}
+    <span class="cg-status" class:compliant={isKinematicsCompliant} class:violation={!isKinematicsCompliant}>
+      {isKinematicsCompliant
+        ? 'COMPLIANT (IN LIMITS)'
+        : $latestKinematics.limiting_factor && $latestKinematics.limiting_factor !== 'NONE'
+          ? `${$latestKinematics.limiting_factor} (NO-GO)`
+          : 'EXCEEDED (NO-GO)'}
     </span>
   </div>
 
@@ -407,7 +321,30 @@
         <span class="tel-val">{$latestKinematics.cruise_tas_kts.toFixed(0)} KT / {$latestKinematics.cruise_fuel_flow_kg_hr.toFixed(0)} KG/H</span>
         <span class="tel-sub">ETE: {$latestKinematics.leg_ete_minutes.toFixed(1)} MIN</span>
       </div>
+      <div class="tel-item">
+        <span class="tel-label">OGE HOVER MARGIN</span>
+        <span
+          class="tel-val"
+          class:text-rose-400={$latestKinematics.oge_margin_kg < 0}
+          class:text-emerald-400={$latestKinematics.oge_margin_kg >= 0}
+        >
+          {$latestKinematics.oge_margin_kg >= 0 ? '+' : ''}{Math.round($latestKinematics.oge_margin_kg)} KG
+        </span>
+        <span class="tel-sub">MAX OGE {Math.round($latestKinematics.max_oge_hover_weight_kg)} KG</span>
+      </div>
     </div>
+
+    {#if $latestKinematics.actionable_advisory}
+      <div class="mitigation-banner" data-testid="kinematics-mitigation">
+        <span class="mitigation-label">MITIGATION //</span>
+        <span class="mitigation-text">{$latestKinematics.actionable_advisory}</span>
+        {#if ($latestKinematics.required_fuel_offload_kg ?? 0) > 0}
+          <span class="mitigation-metric">
+            (OFFLOAD {$latestKinematics.required_fuel_offload_kg} KG)
+          </span>
+        {/if}
+      </div>
+    {/if}
   </div>
 </div>
 
@@ -625,5 +562,32 @@
     background: var(--color-go);
     box-shadow: 0 0 6px var(--color-go);
     transition: left 0.15s ease-out;
+  }
+
+  .mitigation-banner {
+    background: var(--color-nogo-bg);
+    border: 1px solid var(--color-nogo);
+    padding: 5px 7px;
+    font-size: 9px;
+    font-family: var(--font-mono);
+    color: var(--text-primary);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    align-items: center;
+  }
+
+  .mitigation-label {
+    color: var(--color-nogo);
+    font-weight: 800;
+  }
+
+  .mitigation-text {
+    font-weight: 700;
+  }
+
+  .mitigation-metric {
+    color: var(--color-caution);
+    font-weight: 700;
   }
 </style>

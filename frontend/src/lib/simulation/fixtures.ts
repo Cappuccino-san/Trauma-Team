@@ -8,6 +8,12 @@ import {
 import type { TraumaTeamWebSocketRouter } from '../websocket';
 import { activeCorridor } from '../stores/verdict';
 import { activeHazards } from '../stores/weather';
+import {
+  kinematicsPresetStore,
+  latestKinematics,
+  type KinematicsPreset
+} from '../stores/kinematics';
+import { evaluateLocalMissionKinematics } from '../rfmPhysics';
 
 /**
  * Deterministic NOAA AWC & FAA 14 CFR Part 135 Subpart L Simulation Fixtures
@@ -245,6 +251,58 @@ export const FIXTURE_SCENARIOS: Record<string, ComplianceReport> = {
     ]
   },
 
+  HIGH_DA_KLXV: {
+    is_compliant: false,
+    verdict: 'NO-GO',
+    limiting_factor: 'OGE_HOVER_SCENE_DEFICIT',
+    worst_ceiling_ft: 25000,
+    worst_visibility_sm: 10.0,
+    min_required_ceiling_ft: 1000,
+    min_required_vis_sm: 3.0,
+    ceiling_margin_ft: 24000,
+    vis_margin_sm: 7.0,
+    legal_rule_applied: 'RFM OGE Hover Ceiling @ 13,781 ft DA (KLXV 9,927 ft MSL, 28°C, 29.70 inHg)',
+    explanation:
+      'NO-GO (OGE_HOVER_SCENE_DEFICIT): Leadville KLXV (9,927 ft MSL @ 28°C -> 13,781 ft DA) caps Airbus H145 OGE hover at 2,834 kg vs 3,122 kg GW (-288 kg deficit). DEFUEL 289 KG JET-A TO CLEAR OGE HOVER CEILING.',
+    station_reports: [
+      {
+        station_id: 'KAPA',
+        is_compliant: true,
+        actual_ceiling_ft: 25000,
+        required_ceiling_ft: 1000,
+        ceiling_margin_ft: 24000,
+        actual_vis_sm: 10,
+        required_vis_sm: 3,
+        vis_margin_sm: 7,
+        category: 'VFR',
+        explanation: 'COMPLIANT: Ceiling 25000 ft (+24000 ft), Vis 10.0 SM (+7.0 SM)'
+      },
+      {
+        station_id: 'KLXV',
+        is_compliant: true,
+        actual_ceiling_ft: 25000,
+        required_ceiling_ft: 1000,
+        ceiling_margin_ft: 24000,
+        actual_vis_sm: 10,
+        required_vis_sm: 3,
+        vis_margin_sm: 7,
+        category: 'VFR',
+        explanation: 'WX VFR COMPLIANT — RFM OGE DEFICIT: 13,781 ft DA (-288 kg OGE margin)'
+      }
+    ],
+    active_hazards: [],
+    evaluation_time_utc: '2026-11-05T20:15:15Z',
+    audit_trace: [
+      '[RULE] 14 CFR § 135.609 Table 1: Mountainous=true, Day=true, Local=false -> Req 1000ft / 3.0SM',
+      '[STN:KAPA] Ceiling=25000ft (>=1000ft), Vis=10.0SM (>=3.0SM) -> PASS',
+      '[STN:KLXV] Ceiling=25000ft (>=1000ft), Vis=10.0SM (>=3.0SM) -> WX PASS',
+      '[ATMOS:KLXV] Elev 9927ft MSL, QNH 29.70 inHg, OAT 28°C -> PA=10132ft, DA=13781ft',
+      '[RFM:H145] Max OGE Hover Weight=2834kg vs Gross Weight=3122kg -> DEFICIT -288kg (OGE_HOVER_SCENE_DEFICIT)',
+      '[MITIGATION] DEFUEL 289 KG JET-A TO CLEAR OGE HOVER CEILING',
+      '[VERDICT] NO-GO (OGE_HOVER_SCENE_DEFICIT)'
+    ]
+  },
+
   MARGINAL_CAUTION: {
     is_compliant: true,
     verdict: 'MARGINAL',
@@ -451,6 +509,75 @@ export const FIXTURE_SCENARIOS: Record<string, ComplianceReport> = {
   }
 };
 
+export const SCENARIO_KINEMATICS_PRESETS: Record<string, KinematicsPreset> = {
+  NOMINAL_GO: {
+    airframe: 'Airbus H145 (BK117 D-2)',
+    fieldElevFt: 5885,
+    oatC: 18,
+    qnhInHg: 29.95,
+    fuelKg: 420,
+    payloadKg: 140,
+    crewKg: 192,
+    headwindKts: 8,
+    legDistanceNm: 45
+  },
+  HIGH_DA_KLXV: {
+    airframe: 'Airbus H145 (BK117 D-2)',
+    fieldElevFt: 9927,
+    oatC: 28,
+    qnhInHg: 29.7,
+    fuelKg: 580,
+    payloadKg: 210,
+    crewKg: 192,
+    headwindKts: 12,
+    legDistanceNm: 38
+  },
+  MARGINAL_CAUTION: {
+    airframe: 'Airbus H145 (BK117 D-2)',
+    fieldElevFt: 5434,
+    oatC: 6,
+    qnhInHg: 29.98,
+    fuelKg: 380,
+    payloadKg: 120,
+    crewKg: 192,
+    headwindKts: 15,
+    legDistanceNm: 32
+  },
+  ASPEN_BELOW_MINIMUMS: {
+    airframe: 'Airbus H145 (BK117 D-2)',
+    fieldElevFt: 7820,
+    oatC: 0,
+    qnhInHg: 29.85,
+    fuelKg: 380,
+    payloadKg: 140,
+    crewKg: 192,
+    headwindKts: 10,
+    legDistanceNm: 45
+  },
+  IFR_TRANSITION_REQUIRED: {
+    airframe: 'Bell 429 GlobalRanger',
+    fieldElevFt: 7820,
+    oatC: 0,
+    qnhInHg: 29.85,
+    fuelKg: 360,
+    payloadKg: 130,
+    crewKg: 180,
+    headwindKts: 10,
+    legDistanceNm: 48
+  },
+  NEW_ENGLAND_SIGMET: {
+    airframe: 'Airbus H145 (BK117 D-2)',
+    fieldElevFt: 266,
+    oatC: 12,
+    qnhInHg: 29.94,
+    fuelKg: 390,
+    payloadKg: 140,
+    crewKg: 192,
+    headwindKts: 20,
+    legDistanceNm: 52
+  }
+};
+
 let simSeq = 100;
 
 /**
@@ -471,6 +598,12 @@ export function loadSimulationScenario(
       intermediates: ['KMHT'],
       destination: 'KPWM'
     });
+  } else if (scenarioKey === 'HIGH_DA_KLXV') {
+    activeCorridor.set({
+      departure: 'KAPA',
+      intermediates: [],
+      destination: 'KLXV'
+    });
   } else if (scenarioKey === 'ASPEN_BELOW_MINIMUMS' || scenarioKey === 'IFR_TRANSITION_REQUIRED') {
     activeCorridor.set({
       departure: 'KAPA',
@@ -483,6 +616,12 @@ export function loadSimulationScenario(
       intermediates: ['KDEN'],
       destination: 'KLXV'
     });
+  }
+
+  const kinPreset = SCENARIO_KINEMATICS_PRESETS[scenarioKey];
+  if (kinPreset) {
+    kinematicsPresetStore.set({ ...kinPreset });
+    latestKinematics.set(evaluateLocalMissionKinematics(kinPreset));
   }
 
   Object.values(FIXTURE_METARS).forEach((metar) => {

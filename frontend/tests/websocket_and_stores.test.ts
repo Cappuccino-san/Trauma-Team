@@ -329,4 +329,45 @@ describe('TraumaTeam Svelte WebSocket Router & Demultiplexing Stores', () => {
     expect(get(activeHazardCount)).toBe(0);
     expect(get(currentVerdictTier)).toBe('GO');
   });
+
+  it('prevents automatic WebSocket connection on *.github.io static hosts while allowing manual userInitiated connects', async () => {
+    const originalLocation = window.location;
+    Object.defineProperty(window, 'location', {
+      configurable: true,
+      value: new URL('https://cappuccino-san.github.io/Trauma-Team/')
+    });
+
+    try {
+      let factoryCalls = 0;
+      const staticRouter = new TraumaTeamWebSocketRouter({
+        autoReconnect: false,
+        heartbeatIntervalMs: 0,
+        webSocketFactory: (url: string) => {
+          factoryCalls += 1;
+          mockWs = new MockWebSocket(url);
+          return mockWs as unknown as WebSocket;
+        }
+      });
+
+      // Non-user-initiated connect should enter STATIC_SIM without touching WebSocket or setting errors
+      staticRouter.connect();
+      expect(factoryCalls).toBe(0);
+      expect(get(connectionState)).toBe('STATIC_SIM');
+      expect(get(lastGatewayError)).toBeNull();
+
+      // Explicit user-initiated connect (LIVE WS button) should still attempt connection
+      staticRouter.connect('ws://localhost:8080/ws', { userInitiated: true });
+      expect(factoryCalls).toBe(1);
+      expect(get(connectionState)).toBe('CONNECTING');
+      expect(mockWs.url).toBe('ws://localhost:8080/ws');
+
+      staticRouter.disconnect();
+      expect(get(connectionState)).toBe('STATIC_SIM');
+    } finally {
+      Object.defineProperty(window, 'location', {
+        configurable: true,
+        value: originalLocation
+      });
+    }
+  });
 });

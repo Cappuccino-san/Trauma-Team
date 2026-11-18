@@ -6,14 +6,15 @@
     rttLatencyMs,
     subscribedTopics,
     lastGatewayError,
-    wsRouter
+    wsRouter,
+    isStaticHostingEnvironment
   } from '../websocket';
   import { loadSimulationScenario } from '../simulation/fixtures';
 
   export let onOpenCustomPreset: () => void = () => {};
 
   let customUrl =
-    typeof window !== 'undefined'
+    typeof window !== 'undefined' && !isStaticHostingEnvironment()
       ? `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws`
       : 'ws://localhost:8080/ws';
 
@@ -21,7 +22,7 @@
     if ($connectionState === 'CONNECTED' || $connectionState === 'CONNECTING') {
       wsRouter.disconnect();
     } else {
-      wsRouter.connect(customUrl);
+      wsRouter.connect(customUrl, { userInitiated: true });
     }
   }
 
@@ -39,7 +40,7 @@
     <span class="sys-id">TRAUMATEAM // HAA-135.L</span>
     <span class="status-pill status-{$connectionState}">
       <span class="dot"></span>
-      WS: {$connectionState}
+      {$connectionState === 'STATIC_SIM' ? 'STATIC SIM' : `WS: ${$connectionState}`}
     </span>
     <span class="metric">SEQ: <strong>{$lastSeq}</strong></span>
     {#if $seqGapCount > 0}
@@ -58,6 +59,13 @@
       <span class="group-label">SIM PRESETS:</span>
       <button type="button" on:click={() => loadSimulationScenario(wsRouter, 'NOMINAL_GO')}>
         GO (KAPA-KLXV)
+      </button>
+      <button
+        type="button"
+        class="highda-preset-btn"
+        on:click={() => loadSimulationScenario(wsRouter, 'HIGH_DA_KLXV')}
+      >
+        HIGH-DA (KLXV)
       </button>
       <button type="button" on:click={() => loadSimulationScenario(wsRouter, 'MARGINAL_CAUTION')}>
         MARGINAL (NVG)
@@ -173,6 +181,12 @@
     border-color: var(--border-strong);
   }
 
+  .status-STATIC_SIM {
+    color: var(--color-info);
+    border-color: var(--color-info);
+    background: rgba(0, 229, 255, 0.1);
+  }
+
   .metric {
     font-size: 11px;
     color: var(--text-secondary);
@@ -220,5 +234,15 @@
   .custom-preset-btn:hover {
     background: var(--color-go);
     color: #000;
+  }
+
+  .highda-preset-btn {
+    color: var(--color-nogo);
+    border-color: rgba(255, 23, 68, 0.55);
+  }
+
+  .highda-preset-btn:hover {
+    background: var(--color-nogo);
+    color: #fff;
   }
 </style>

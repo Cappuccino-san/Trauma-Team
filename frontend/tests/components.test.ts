@@ -6,7 +6,8 @@ import CgEnvelope from '../src/lib/components/CgEnvelope.svelte';
 import StationWeatherGrid from '../src/lib/components/StationWeatherGrid.svelte';
 import HazardAndTracePanel from '../src/lib/components/HazardAndTracePanel.svelte';
 import CustomPresetModal from '../src/lib/components/CustomPresetModal.svelte';
-import { resetRouterStores, wsRouter } from '../src/lib/websocket';
+import ConnectionHeader from '../src/lib/components/ConnectionHeader.svelte';
+import { resetRouterStores, wsRouter, connectionState } from '../src/lib/websocket';
 import { resetWeatherStore, activeHazardCount } from '../src/lib/stores/weather';
 import {
   resetVerdictStore,
@@ -144,5 +145,26 @@ describe('TraumaTeam Svelte 5 Component & E2E Integration Suite', () => {
 
     expect(get(latestComplianceReport)?.verdict).toBe('APPROVED');
     expect(get(latestComplianceReport)?.explanation).toContain('Custom simulation');
+  });
+
+  it('ConnectionHeader displays STATIC SIM indicator and HIGH-DA (KLXV) triggers OGE_HOVER_SCENE_DEFICIT with defuel mitigation in CgEnvelope', async () => {
+    connectionState.set('STATIC_SIM');
+    const header = render(ConnectionHeader);
+    const cg = render(CgEnvelope);
+
+    expect(header.container.textContent).toContain('STATIC SIM');
+    expect(header.container.textContent).not.toContain('WS: RECONNECTING');
+
+    const highDaBtn = header.getByText('HIGH-DA (KLXV)');
+    await fireEvent.click(highDaBtn);
+    await Promise.resolve();
+
+    expect(get(latestComplianceReport)?.verdict).toBe('NO-GO');
+    expect(get(latestComplianceReport)?.limiting_factor).toBe('OGE_HOVER_SCENE_DEFICIT');
+    expect(get(latestKinematics).limiting_factor).toBe('OGE_HOVER_SCENE_DEFICIT');
+    expect(get(latestKinematics).oge_margin_kg).toBeLessThan(0);
+    expect(get(latestKinematics).required_fuel_offload_kg).toBeGreaterThan(250);
+    expect(cg.container.textContent).toContain('OGE_HOVER_SCENE_DEFICIT');
+    expect(cg.getByTestId('kinematics-mitigation').textContent).toContain('DEFUEL');
   });
 });
