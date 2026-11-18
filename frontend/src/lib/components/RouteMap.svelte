@@ -14,7 +14,7 @@
   let markers: maplibregl.Marker[] = [];
   let isExpanded = false;
   let mapLoaded = false;
-  let basemapLabel: 'CARTO DARK' | 'OFFLINE VECTOR' = 'CARTO DARK';
+  let basemapLabel: 'OPENFREEMAP DARK' | 'OFFLINE VECTOR' = 'OPENFREEMAP DARK';
   let lastCorridorKey = '';
   let focusTimer: ReturnType<typeof setTimeout> | null = null;
   let resizeTimer: ReturnType<typeof setTimeout> | null = null;
@@ -660,20 +660,30 @@
       maplibregl.setWorkerUrl(new URL(maplibreWorkerUrl, window.location.href).href);
     }
 
-    // CARTO Dark Matter raster basemap with procedural aeronautical graticule & terrain overlay/fallback
+    const OPENFREEMAP_LAYER_IDS = [
+      'openfreemap-landcover-wood',
+      'openfreemap-park',
+      'openfreemap-water',
+      'openfreemap-waterway',
+      'openfreemap-aeroway-area',
+      'openfreemap-aeroway-line',
+      'openfreemap-road-minor',
+      'openfreemap-road-major',
+      'openfreemap-boundary-state',
+      'openfreemap-boundary-country',
+      'openfreemap-place-state',
+      'openfreemap-place-city'
+    ];
+
+    // Keyless OpenFreeMap dark tactical vector basemap with procedural aeronautical graticule & terrain overlay/fallback
     const mapStyle: maplibregl.StyleSpecification = {
       version: 8,
+      glyphs: 'https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf',
       sources: {
-        'carto-dark': {
-          type: 'raster',
-          tiles: [
-            'https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png',
-            'https://b.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png',
-            'https://c.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png',
-            'https://d.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png'
-          ],
-          tileSize: 256,
-          attribution: '© OpenStreetMap © CARTO'
+        openfreemap: {
+          type: 'vector',
+          url: 'https://tiles.openfreemap.org/planet',
+          attribution: '© OpenFreeMap © OpenMapTiles © OpenStreetMap contributors'
         },
         graticule: {
           type: 'geojson',
@@ -686,11 +696,156 @@
       },
       layers: [
         {
-          id: 'carto-dark-layer',
-          type: 'raster',
-          source: 'carto-dark',
+          id: 'tactical-bg',
+          type: 'background',
           paint: {
-            'raster-opacity': 0.95
+            'background-color': '#05080c'
+          }
+        },
+        {
+          id: 'openfreemap-landcover-wood',
+          type: 'fill',
+          source: 'openfreemap',
+          'source-layer': 'landcover',
+          filter: ['==', ['get', 'class'], 'wood'],
+          paint: {
+            'fill-color': '#081117',
+            'fill-opacity': 0.55
+          }
+        },
+        {
+          id: 'openfreemap-park',
+          type: 'fill',
+          source: 'openfreemap',
+          'source-layer': 'park',
+          paint: {
+            'fill-color': '#0a141c',
+            'fill-opacity': 0.5
+          }
+        },
+        {
+          id: 'openfreemap-water',
+          type: 'fill',
+          source: 'openfreemap',
+          'source-layer': 'water',
+          paint: {
+            'fill-color': '#0b1929'
+          }
+        },
+        {
+          id: 'openfreemap-waterway',
+          type: 'line',
+          source: 'openfreemap',
+          'source-layer': 'waterway',
+          paint: {
+            'line-color': '#122840',
+            'line-width': 1
+          }
+        },
+        {
+          id: 'openfreemap-aeroway-area',
+          type: 'fill',
+          source: 'openfreemap',
+          'source-layer': 'aeroway',
+          filter: ['==', ['geometry-type'], 'Polygon'],
+          paint: {
+            'fill-color': '#132131',
+            'fill-opacity': 0.55
+          }
+        },
+        {
+          id: 'openfreemap-aeroway-line',
+          type: 'line',
+          source: 'openfreemap',
+          'source-layer': 'aeroway',
+          filter: ['match', ['geometry-type'], ['LineString', 'MultiLineString'], true, false],
+          paint: {
+            'line-color': '#28435e',
+            'line-width': 1.4
+          }
+        },
+        {
+          id: 'openfreemap-road-minor',
+          type: 'line',
+          source: 'openfreemap',
+          'source-layer': 'transportation',
+          minzoom: 9,
+          filter: ['in', ['get', 'class'], ['literal', ['secondary', 'tertiary']]],
+          paint: {
+            'line-color': '#142130',
+            'line-width': 0.7,
+            'line-opacity': 0.75
+          }
+        },
+        {
+          id: 'openfreemap-road-major',
+          type: 'line',
+          source: 'openfreemap',
+          'source-layer': 'transportation',
+          filter: ['in', ['get', 'class'], ['literal', ['motorway', 'trunk', 'primary']]],
+          paint: {
+            'line-color': '#1b2e44',
+            'line-width': ['interpolate', ['linear'], ['zoom'], 5, 0.6, 10, 1.5],
+            'line-opacity': 0.85
+          }
+        },
+        {
+          id: 'openfreemap-boundary-state',
+          type: 'line',
+          source: 'openfreemap',
+          'source-layer': 'boundary',
+          filter: ['all', ['==', ['get', 'admin_level'], 4], ['!=', ['get', 'maritime'], 1]],
+          paint: {
+            'line-color': '#2c4866',
+            'line-width': 1.1,
+            'line-dasharray': [3, 2]
+          }
+        },
+        {
+          id: 'openfreemap-boundary-country',
+          type: 'line',
+          source: 'openfreemap',
+          'source-layer': 'boundary',
+          filter: ['all', ['==', ['get', 'admin_level'], 2], ['!=', ['get', 'maritime'], 1]],
+          paint: {
+            'line-color': '#3c5e82',
+            'line-width': 1.4
+          }
+        },
+        {
+          id: 'openfreemap-place-state',
+          type: 'symbol',
+          source: 'openfreemap',
+          'source-layer': 'place',
+          filter: ['==', ['get', 'class'], 'state'],
+          layout: {
+            'text-field': ['coalesce', ['get', 'name:latin'], ['get', 'name']],
+            'text-font': ['Noto Sans Regular'],
+            'text-size': 11,
+            'text-transform': 'uppercase',
+            'text-letter-spacing': 0.14
+          },
+          paint: {
+            'text-color': '#466587',
+            'text-halo-color': '#05080c',
+            'text-halo-width': 1.2
+          }
+        },
+        {
+          id: 'openfreemap-place-city',
+          type: 'symbol',
+          source: 'openfreemap',
+          'source-layer': 'place',
+          filter: ['in', ['get', 'class'], ['literal', ['city', 'town']]],
+          layout: {
+            'text-field': ['coalesce', ['get', 'name:latin'], ['get', 'name']],
+            'text-font': ['Noto Sans Regular'],
+            'text-size': ['interpolate', ['linear'], ['zoom'], 5, 9, 10, 11.5]
+          },
+          paint: {
+            'text-color': '#6584a3',
+            'text-halo-color': '#05080c',
+            'text-halo-width': 1.2
           }
         },
         {
@@ -752,10 +907,15 @@
     );
 
     map.on('error', (err: maplibregl.ErrorEvent & { sourceId?: string }) => {
-      if (err?.sourceId === 'carto-dark' && basemapLabel !== 'OFFLINE VECTOR') {
+      const errObj = err?.error as { name?: string; message?: string } | undefined;
+      const errMsg = errObj?.message || '';
+      const isAbort = errObj?.name === 'AbortError' || /abort/i.test(errMsg);
+      if (!isAbort && err?.sourceId === 'openfreemap' && basemapLabel !== 'OFFLINE VECTOR') {
         basemapLabel = 'OFFLINE VECTOR';
-        if (map?.getLayer('carto-dark-layer')) {
-          map.setLayoutProperty('carto-dark-layer', 'visibility', 'none');
+        for (const layerId of OPENFREEMAP_LAYER_IDS) {
+          if (map?.getLayer(layerId)) {
+            map.setLayoutProperty(layerId, 'visibility', 'none');
+          }
         }
         if (map?.getLayer('terrain-sector-fill')) {
           map.setPaintProperty('terrain-sector-fill', 'fill-opacity', 0.72);
@@ -865,7 +1025,7 @@
         <span class="hud-label">BASEMAP</span>
         <span
           class="hud-val"
-          class:text-emerald-400={basemapLabel === 'CARTO DARK'}
+          class:text-emerald-400={basemapLabel === 'OPENFREEMAP DARK'}
           class:text-amber-400={basemapLabel === 'OFFLINE VECTOR'}
           data-testid="basemap-status"
         >

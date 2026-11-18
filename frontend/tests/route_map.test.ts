@@ -42,7 +42,19 @@ const {
     }),
     getLayer: vi.fn((id: string) =>
       [
-        'carto-dark-layer',
+        'tactical-bg',
+        'openfreemap-landcover-wood',
+        'openfreemap-park',
+        'openfreemap-water',
+        'openfreemap-waterway',
+        'openfreemap-aeroway-area',
+        'openfreemap-aeroway-line',
+        'openfreemap-road-minor',
+        'openfreemap-road-major',
+        'openfreemap-boundary-state',
+        'openfreemap-boundary-country',
+        'openfreemap-place-state',
+        'openfreemap-place-city',
         'graticule-minor',
         'graticule-major',
         'terrain-sector-fill',
@@ -137,7 +149,7 @@ describe('RouteMap static worker, coalesced concurrent updates & unmount cleanup
     markerCalls.length = 0;
   });
 
-  it('configures CARTO Dark basemap at bottom of layer stack, coalesces concurrent updates, falls back on tile error, and cleans up on unmount', async () => {
+  it('configures OpenFreeMap Dark vector basemap at bottom of layer stack, coalesces concurrent updates, falls back on tile error, and cleans up on unmount', async () => {
     const { unmount, getByTestId } = render(RouteMap);
 
     expect(setWorkerUrlMock).toHaveBeenCalledTimes(1);
@@ -151,20 +163,25 @@ describe('RouteMap static worker, coalesced concurrent updates & unmount cleanup
 
     const mapOptions = mapConstructorMock.mock.calls[0][0] as unknown as {
       style: {
-        sources: Record<string, { type: string; tileSize?: number; tiles?: string[]; attribution?: string }>;
+        glyphs?: string;
+        sources: Record<string, { type: string; url?: string; attribution?: string }>;
         layers: Array<{ id: string; type: string; source?: string }>;
       };
     };
-    expect(mapOptions.style.sources['carto-dark']?.type).toBe('raster');
-    expect(mapOptions.style.sources['carto-dark']?.tileSize).toBe(256);
-    expect(mapOptions.style.sources['carto-dark']?.tiles).toHaveLength(4);
-    expect(mapOptions.style.sources['carto-dark']?.attribution).toBe('© OpenStreetMap © CARTO');
+    expect(mapOptions.style.glyphs).toBe('https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf');
+    expect(mapOptions.style.sources['openfreemap']?.type).toBe('vector');
+    expect(mapOptions.style.sources['openfreemap']?.url).toBe('https://tiles.openfreemap.org/planet');
+    expect(mapOptions.style.sources['openfreemap']?.attribution).toBe(
+      '© OpenFreeMap © OpenMapTiles © OpenStreetMap contributors'
+    );
     expect(mapOptions.style.layers[0]).toMatchObject({
-      id: 'carto-dark-layer',
-      type: 'raster',
-      source: 'carto-dark'
+      id: 'tactical-bg',
+      type: 'background'
     });
-    expect(getByTestId('basemap-status').textContent?.trim()).toBe('CARTO DARK');
+    const layerIds = mapOptions.style.layers.map((l) => l.id);
+    expect(layerIds.indexOf('openfreemap-water')).toBeGreaterThan(0);
+    expect(layerIds.indexOf('openfreemap-place-city')).toBeLessThan(layerIds.indexOf('graticule-minor'));
+    expect(getByTestId('basemap-status').textContent?.trim()).toBe('OPENFREEMAP DARK');
 
     const mapInstance = mapConstructorMock.mock.results[0].value as {
       __trigger: (event: string, payload?: unknown) => void;
@@ -205,11 +222,11 @@ describe('RouteMap static worker, coalesced concurrent updates & unmount cleanup
     expect(setDataHazardsMock).toHaveBeenCalledTimes(1);
     expect(setPaintPropertyMock).toHaveBeenCalledWith('route-line', 'line-color', '#ff1744');
 
-    // Simulate raster tile error on carto-dark -> automatic fallback to OFFLINE VECTOR
-    mapInstance.__trigger('error', { sourceId: 'carto-dark', error: new Error('Tile network error') });
+    // Simulate vector tile error on openfreemap -> automatic fallback to OFFLINE VECTOR
+    mapInstance.__trigger('error', { sourceId: 'openfreemap', error: new Error('Tile network error') });
     await Promise.resolve();
     expect(getByTestId('basemap-status').textContent?.trim()).toBe('OFFLINE VECTOR');
-    expect(setLayoutPropertyMock).toHaveBeenCalledWith('carto-dark-layer', 'visibility', 'none');
+    expect(setLayoutPropertyMock).toHaveBeenCalledWith('openfreemap-water', 'visibility', 'none');
     expect(setPaintPropertyMock).toHaveBeenCalledWith('terrain-sector-fill', 'fill-opacity', 0.72);
 
     // Queue another update and immediately unmount before RAF fires to verify clean cancellation
