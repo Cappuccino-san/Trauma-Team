@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
   import * as maplibregl from 'maplibre-gl';
+  import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url';
   import 'maplibre-gl/dist/maplibre-gl.css';
   import type { Feature, FeatureCollection } from 'geojson';
   import { activeHazards } from '../stores/weather';
@@ -318,6 +319,10 @@
   }
 
   onMount(() => {
+    if (typeof window !== 'undefined' && typeof maplibregl.setWorkerUrl === 'function') {
+      maplibregl.setWorkerUrl(new URL(maplibreWorkerUrl, window.location.href).href);
+    }
+
     // 100% air-gapped procedural aeronautical vector style (no external tiles or glyphs)
     const offlineStyle: maplibregl.StyleSpecification = {
       version: 8,
@@ -450,7 +455,11 @@
         }
       });
 
-      updateLayers();
+      if (map?.isStyleLoaded()) {
+        updateLayers();
+      } else {
+        syncWaypointMarkers();
+      }
       setTimeout(focusCorridor, 100);
     });
   });

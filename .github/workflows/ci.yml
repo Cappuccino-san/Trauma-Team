@@ -44,6 +44,17 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
+      - name: Setup Rust Toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: crates/traumateam_rfm
+
+      - name: Build Rust RFM Native Library
+        run: cargo build --manifest-path crates/traumateam_rfm/Cargo.toml --release
+
       - name: Setup Go Toolchain
         uses: actions/setup-go@v5
         with:
@@ -84,8 +95,10 @@ jobs:
       - name: Verify CLI Entry Points
         run: |
           uv run traumateam --help
-          uv run traumateam airframe --model H145
-          uv run traumateam regulations --environment non-mountainous --flight-phase day
+          uv run traumateam airframe --type H145
+          uv run traumateam regulations
+          uv run traumateam regulations --mountainous --night --no-nvg
+          uv run traumateam dispatch --airframe H145
           uv run traumateam-demo
           uv run python demo_dispatch.py
 

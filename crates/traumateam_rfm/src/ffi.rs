@@ -416,7 +416,7 @@ pub unsafe extern "C" fn traumateam_compute_atmosphere_ffi(
     if out_pa_ft.is_null() || out_da_ft.is_null() {
         return -1;
     }
-    match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+    std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
         if !elevation_ft.is_finite()
             || !altimeter_inhg.is_finite()
             || !oat_celsius.is_finite()
@@ -432,10 +432,8 @@ pub unsafe extern "C" fn traumateam_compute_atmosphere_ffi(
         *out_pa_ft = pa;
         *out_da_ft = da;
         0
-    })) {
-        Ok(rc) => rc,
-        Err(_) => -99,
-    }
+    }))
+    .unwrap_or(-99)
 }
 
 /// Evaluates aircraft Mass & Balance and CG envelope margins via C ABI.
@@ -963,7 +961,13 @@ mod tests {
         );
         assert_eq!(
             unsafe {
-                traumateam_eval_mass_balance_ffi(0, 300.0, std::ptr::null(), 0, std::ptr::null_mut())
+                traumateam_eval_mass_balance_ffi(
+                    0,
+                    300.0,
+                    std::ptr::null(),
+                    0,
+                    std::ptr::null_mut(),
+                )
             },
             -1
         );
@@ -1038,14 +1042,12 @@ mod tests {
         for bad_input in cases {
             let mut res = FfiPerformanceKinematicResult::default();
             let rc = unsafe {
-                traumateam_eval_mission_kinematics_ffi(
-                    &bad_input,
-                    std::ptr::null(),
-                    0,
-                    &mut res,
-                )
+                traumateam_eval_mission_kinematics_ffi(&bad_input, std::ptr::null(), 0, &mut res)
             };
-            assert!(rc < 0, "expected error status for bad input {bad_input:?}, got {rc}");
+            assert!(
+                rc < 0,
+                "expected error status for bad input {bad_input:?}, got {rc}"
+            );
             assert_eq!(res.is_feasible, 0);
             assert_eq!(res.verdict_code, FfiVerdictCode::NoGo as u32);
         }
