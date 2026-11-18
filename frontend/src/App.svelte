@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import ConnectionHeader from './lib/components/ConnectionHeader.svelte';
   import VerdictBanner from './lib/components/VerdictBanner.svelte';
+  import MissionLegStrip from './lib/components/MissionLegStrip.svelte';
   import CorridorControlPanel from './lib/components/CorridorControlPanel.svelte';
   import StationWeatherGrid from './lib/components/StationWeatherGrid.svelte';
   import HazardAndTracePanel from './lib/components/HazardAndTracePanel.svelte';
@@ -72,9 +73,10 @@
     </div>
   </nav>
 
-  <!-- Primary Dispatch Feasibility Verdict Banner (Full-Width Command Strip) -->
+  <!-- Primary Dispatch Feasibility Verdict Banner & 7-Leg Mission Profile Strip -->
   <div class="verdict-strip">
     <VerdictBanner />
+    <MissionLegStrip />
   </div>
 
   <!-- Structured 12-Column Avionics Grid (Sequential 01 -> 05) -->

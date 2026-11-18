@@ -34,7 +34,7 @@
     if (cmd === 'help') {
       pushConsole(
         'out',
-        'Commands: eval [DEP] [INT] [DEST] | get <ICAO> | sub <ICAO...> | preset <go|marginal|nogo|ifr|sigmet> | ping | clear'
+        'Commands: eval [DEP] [INT] [DEST] | get <ICAO> | sub <ICAO...> | preset <go|highda|marginal|nogo|ifr|sigmet> | ping | clear'
       );
     } else if (cmd === 'clear') {
       consoleHistory = [];
@@ -87,6 +87,7 @@
       const p = parts[1].toLowerCase();
       const map: Record<string, any> = {
         go: 'NOMINAL_GO',
+        highda: 'HIGH_DA_KLXV',
         marginal: 'MARGINAL_CAUTION',
         nogo: 'ASPEN_BELOW_MINIMUMS',
         ifr: 'IFR_TRANSITION_REQUIRED',
@@ -96,7 +97,7 @@
         loadSimulationScenario(wsRouter, map[p]);
         pushConsole('out', `Loaded simulation scenario: ${map[p]}`);
       } else {
-        pushConsole('err', `Unknown preset "${p}". Use: go, marginal, nogo, ifr, sigmet`);
+        pushConsole('err', `Unknown preset "${p}". Use: go, highda, marginal, nogo, ifr, sigmet`);
       }
     } else {
       try {

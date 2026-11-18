@@ -377,11 +377,49 @@ function interpolateCruisePerformance(
   return { tasKts, fuelFlowKgHr };
 }
 
+export interface ResolvedLoadAllocation {
+  effectiveCrewKg: number;
+  litterKg: number;
+  rackKg: number;
+  crewAndLitterKg: number;
+  totalPayloadAndCrewKg: number;
+}
+
+export function resolveLoadAllocation(input: KinematicsPreset): ResolvedLoadAllocation {
+  if (input.crewAndLitterKg !== undefined || input.specialtyGearKg !== undefined) {
+    const crewBase = Math.max(0, input.crewBaseKg ?? input.crewKg ?? 192);
+    const crewAndLitter = Math.max(
+      0,
+      input.crewAndLitterKg ?? input.crewKg + input.payloadKg * 0.65
+    );
+    const effectiveCrewKg = Math.min(crewBase, crewAndLitter);
+    const litterKg = Math.max(0, crewAndLitter - effectiveCrewKg);
+    const rackKg = Math.max(0, input.specialtyGearKg ?? input.payloadKg * 0.35);
+    return {
+      effectiveCrewKg,
+      litterKg,
+      rackKg,
+      crewAndLitterKg: crewAndLitter,
+      totalPayloadAndCrewKg: crewAndLitter + rackKg
+    };
+  }
+
+  const effectiveCrewKg = Math.max(0, input.crewKg);
+  const litterKg = Math.max(0, input.payloadKg * 0.65);
+  const rackKg = Math.max(0, input.payloadKg * 0.35);
+  return {
+    effectiveCrewKg,
+    litterKg,
+    rackKg,
+    crewAndLitterKg: effectiveCrewKg + litterKg,
+    totalPayloadAndCrewKg: effectiveCrewKg + litterKg + rackKg
+  };
+}
+
 function computeCgAtFuel(
   spec: AirframeRfmSpec,
   fuelMassKg: number,
-  payloadKg: number,
-  crewKg: number
+  load: ResolvedLoadAllocation
 ): { gwKg: number; cgLongMm: number; cgLatMm: number } {
   const clampedFuel = Math.max(0, Math.min(spec.usableFuelCapacityKg, fuelMassKg));
   const fuelLongArm = interp1d(
@@ -395,27 +433,25 @@ function computeCgAtFuel(
     spec.fuelArms.map((p) => p.armLatMm)
   );
 
-  const pilotKg = crewKg * 0.48;
-  const attendantKg = crewKg * 0.52;
-  const litterKg = payloadKg * 0.65;
-  const rackKg = payloadKg * 0.35;
+  const pilotKg = load.effectiveCrewKg * 0.48;
+  const attendantKg = load.effectiveCrewKg * 0.52;
 
-  const gwKg = spec.emptyWeightKg + Math.max(0, fuelMassKg) + payloadKg + crewKg;
+  const gwKg = spec.emptyWeightKg + Math.max(0, fuelMassKg) + load.totalPayloadAndCrewKg;
   const longMoment =
     spec.emptyWeightKg * spec.emptyCgLongMm +
     Math.max(0, fuelMassKg) * fuelLongArm +
     pilotKg * spec.pilotLongArmMm +
     attendantKg * spec.attendantLongArmMm +
-    litterKg * spec.litterLongArmMm +
-    rackKg * spec.rackLongArmMm;
+    load.litterKg * spec.litterLongArmMm +
+    load.rackKg * spec.rackLongArmMm;
 
   const latMoment =
     spec.emptyWeightKg * spec.emptyCgLatMm +
     Math.max(0, fuelMassKg) * fuelLatArm +
     pilotKg * spec.pilotLatArmMm +
     attendantKg * spec.attendantLatArmMm +
-    litterKg * spec.litterLatArmMm +
-    rackKg * spec.rackLatArmMm;
+    load.litterKg * spec.litterLatArmMm +
+    load.rackKg * spec.rackLatArmMm;
 
   return {
     gwKg,
@@ -432,12 +468,18 @@ export function evaluateLocalMissionKinematics(
   input: KinematicsPreset
 ): MissionKinematicsEvaluation {
   const spec = getAirframeSpec(input.airframe);
-  const legDistanceNm = input.legDistanceNm ?? 45.0;
+  const legDistanceNm = Math.max(0, input.legDistanceNm ?? 45.0);
+  const sceneHoverMinutes = Math.max(0, input.sceneHoverMinutes ?? 5.0);
+  const isIfr = Boolean(input.isIfr);
+  const reserveRequiredMinutes = isIfr ? 30.0 : 20.0;
+  const warmupMinutes = 2.0;
+  const helipadMinutes = 2.0;
+  const load = resolveLoadAllocation(input);
 
   const paFt = computePressureAltitudeFt(input.fieldElevFt, input.qnhInHg);
   const daFt = computeDensityAltitudeFt(paFt, input.oatC);
 
-  const takeoffState = computeCgAtFuel(spec, input.fuelKg, input.payloadKg, input.crewKg);
+  const takeoffState = computeCgAtFuel(spec, input.fuelKg, load);
   const totalGW = takeoffState.gwKg;
   const longCG = takeoffState.cgLongMm;
   const latCG = takeoffState.cgLatMm;
@@ -465,11 +507,6 @@ export function evaluateLocalMissionKinematics(
   const aftMargin = aftLimit - longCG;
   const leftMargin = latCG - leftLimit;
   const rightMargin = rightLimit - latCG;
-
-  const isGwOk = totalGW >= spec.minFlightWeightKg && totalGW <= spec.mtowKg;
-  const isLongOk = fwdMargin >= -1e-4 && aftMargin >= -1e-4;
-  const isLatOk = leftMargin >= -1e-4 && rightMargin >= -1e-4;
-  const isOverallCompliant = isGwOk && isLongOk && isLatOk;
 
   // Exact 2D Bilinear RFM Hover Weight Limits
   const maxIgeWeight = Math.min(
@@ -511,7 +548,7 @@ export function evaluateLocalMissionKinematics(
     spec.oeiTable
   );
 
-  // 3D Cruise Performance + Wind Triangle + § 135.209 Fuel Reserve
+  // 3D Cruise Performance + Wind Triangle + 7-Leg Burn + § 135.209 Fuel Reserve
   const { tasKts: cruiseTasKts, fuelFlowKgHr: cruiseFfKgHr } = interpolateCruisePerformance(
     spec,
     paFt,
@@ -523,16 +560,47 @@ export function evaluateLocalMissionKinematics(
 
   const groundspeedKts = Math.max(20.0, cruiseTasKts - input.headwindKts);
   const isWindFlyable = cruiseTasKts - input.headwindKts > 20.0;
-  const legEteMinutes = (legDistanceNm / groundspeedKts) * 60.0;
-  const legFuelBurnKg = (legEteMinutes / 60.0) * cruiseFfKgHr;
-  const remainingFuelKg = input.fuelKg - legFuelBurnKg;
+  const cruiseEteMinutes = (legDistanceNm / groundspeedKts) * 60.0;
+  const totalEteMinutes = warmupMinutes + cruiseEteMinutes + sceneHoverMinutes + helipadMinutes;
+  const missionFuelBurnKg =
+    (warmupMinutes / 60.0) * loiterFf +
+    (cruiseEteMinutes / 60.0) * cruiseFfKgHr +
+    ((sceneHoverMinutes + helipadMinutes) / 60.0) * hoverOgeFf;
+
+  const remainingFuelKg = input.fuelKg - missionFuelBurnKg;
   const reserve20MinKg = (20.0 / 60.0) * cruiseFfKgHr;
-  const reserveMarginKg = remainingFuelKg - reserve20MinKg;
+  const reserveRequiredKg = (reserveRequiredMinutes / 60.0) * cruiseFfKgHr;
+  const reserveMarginKg = remainingFuelKg - reserveRequiredKg;
+  const reserveMarginMinutes = cruiseFfKgHr > 0 ? (reserveMarginKg / cruiseFfKgHr) * 60.0 : 0.0;
 
   // Landing & Zero-Fuel Burn Vector States
   const landingFuelKg = Math.max(0, remainingFuelKg);
-  const landingState = computeCgAtFuel(spec, landingFuelKg, input.payloadKg, input.crewKg);
-  const zeroFuelState = computeCgAtFuel(spec, 0, input.payloadKg, input.crewKg);
+  const landingState = computeCgAtFuel(spec, landingFuelKg, load);
+  const zeroFuelState = computeCgAtFuel(spec, 0, load);
+
+  const ldgFwdLimit = interp1d(
+    landingState.gwKg,
+    envWeights,
+    spec.cgEnvelope.map((p) => p.fwd)
+  );
+  const ldgAftLimit = interp1d(
+    landingState.gwKg,
+    envWeights,
+    spec.cgEnvelope.map((p) => p.aft)
+  );
+  const ldgLatLimit = interp1d(
+    landingState.gwKg,
+    envWeights,
+    spec.cgEnvelope.map((p) => p.lat)
+  );
+  const ldgFwdMargin = landingState.cgLongMm - ldgFwdLimit;
+  const ldgAftMargin = ldgAftLimit - landingState.cgLongMm;
+  const ldgLatMargin = ldgLatLimit - Math.abs(landingState.cgLatMm);
+
+  const isGwOk = totalGW >= spec.minFlightWeightKg && totalGW <= spec.mtowKg;
+  const isLongOk = fwdMargin >= -1e-4 && aftMargin >= -1e-4 && ldgFwdMargin >= -1e-4 && ldgAftMargin >= -1e-4;
+  const isLatOk = leftMargin >= -1e-4 && rightMargin >= -1e-4 && ldgLatMargin >= -1e-4;
+  const isOverallCompliant = isGwOk && isLongOk && isLatOk;
 
   // Limiting factor & verdict (MTOW, CG, OGE/IGE Hover, § 135.209 Fuel Reserve)
   let mbLimitingFactor = 'NONE';
@@ -541,8 +609,9 @@ export function evaluateLocalMissionKinematics(
   } else if (totalGW < spec.minFlightWeightKg) {
     mbLimitingFactor = 'MIN_WEIGHT_VIOLATION';
   } else if (!isLongOk) {
+    const worstFwd = Math.min(fwdMargin, ldgFwdMargin);
     mbLimitingFactor =
-      fwdMargin < 0 ? 'LONGITUDINAL_CG_FORWARD_EXCEEDED' : 'LONGITUDINAL_CG_AFT_EXCEEDED';
+      worstFwd < 0 ? 'LONGITUDINAL_CG_FORWARD_EXCEEDED' : 'LONGITUDINAL_CG_AFT_EXCEEDED';
   } else if (!isLatOk) {
     mbLimitingFactor = leftMargin < 0 ? 'LATERAL_CG_LEFT_EXCEEDED' : 'LATERAL_CG_RIGHT_EXCEEDED';
   }
@@ -563,10 +632,7 @@ export function evaluateLocalMissionKinematics(
     limitingFactor = 'IGE_HOVER_DEFICIT';
   } else if (reserveMarginKg < 0) {
     verdict = 'NO-GO';
-    limitingFactor = 'FAR_135_209_VFR_RESERVE_VIOLATION';
-  } else if (ogeMargin < 25 && ogeMargin >= 0) {
-    // Allow exact mitigation landing cleanly in GO when >= 1 kg, or keep >= 0 GO
-    verdict = 'GO';
+    limitingFactor = isIfr ? 'IFR_RESERVE_VIOLATION' : 'FAR_135_209_VFR_RESERVE_VIOLATION';
   }
 
   // Actionable Trade-Off Telemetry Solver
@@ -580,16 +646,18 @@ export function evaluateLocalMissionKinematics(
 
   const roundUpKg = (val: number) => Math.max(0, Math.ceil(val - 1e-6));
 
-  // Helper: solve minimum fuel required to fly leg + 20-min reserve at a given fuel-less base mass
+  // Solve minimum fuel required to fly 7-leg mission + § 135.209 statutory reserve
   const solveMinFuelForBaseWeight = (baseMassNoFuelKg: number): number => {
-    let estFuel = legFuelBurnKg + reserve20MinKg;
+    let estFuel = missionFuelBurnKg + reserveRequiredKg;
     for (let i = 0; i < 4; i++) {
       const testGw = baseMassNoFuelKg + estFuel;
       const perf = interpolateCruisePerformance(spec, paFt, input.oatC, testGw);
       const gs = Math.max(20.0, perf.tasKts - input.headwindKts);
-      const burn = (legDistanceNm / gs) * perf.fuelFlowKgHr;
-      const res = (20.0 / 60.0) * perf.fuelFlowKgHr;
-      estFuel = burn + res;
+      const cruiseBurn = (legDistanceNm / gs) * perf.fuelFlowKgHr;
+      const hoverBurn = ((sceneHoverMinutes + helipadMinutes) / 60.0) * perf.fuelFlowKgHr * spec.hoverFuelFactor;
+      const warmBurn = (warmupMinutes / 60.0) * perf.fuelFlowKgHr * spec.loiterFuelFactor;
+      const res = (reserveRequiredMinutes / 60.0) * perf.fuelFlowKgHr;
+      estFuel = cruiseBurn + hoverBurn + warmBurn + res;
     }
     return estFuel;
   };
@@ -626,18 +694,20 @@ export function evaluateLocalMissionKinematics(
     const projectedFuel = input.fuelKg + additionalFuelRequiredKg;
 
     if (projectedFuel > spec.usableFuelCapacityKg) {
-      actionableAdvisory = `REFUEL +${additionalFuelRequiredKg} KG EXCEEDS ${spec.usableFuelCapacityKg} KG TANK CAP — DIVERT OR REDUCE HEADWIND`;
+      actionableAdvisory = `REFUEL +${additionalFuelRequiredKg} KG EXCEEDS ${spec.usableFuelCapacityKg} KG TANK CAP — DIVERT OR REDUCE HOVER`;
     } else if (projectedGw > maxAllowableGw) {
       requiredPayloadReductionKg = roundUpKg(projectedGw - maxAllowableGw);
       actionableAdvisory = `REFUEL +${additionalFuelRequiredKg} KG & OFFLOAD ${requiredPayloadReductionKg} KG PAYLOAD FOR §135.209`;
     } else {
-      actionableAdvisory = `REFUEL +${additionalFuelRequiredKg} KG JET-A FOR § 135.209 20-MIN RESERVE`;
+      actionableAdvisory = `REFUEL +${additionalFuelRequiredKg} KG JET-A FOR § 135.209 ${reserveRequiredMinutes}-MIN RESERVE`;
     }
   } else if (!isLongOk) {
+    const worstFwd = Math.min(fwdMargin, ldgFwdMargin);
+    const worstAft = Math.min(aftMargin, ldgAftMargin);
     actionableAdvisory =
-      fwdMargin < 0
-        ? `CG ${Math.abs(fwdMargin).toFixed(0)} MM FWD OF LIMIT — SHIFT LOAD AFT`
-        : `CG ${Math.abs(aftMargin).toFixed(0)} MM AFT OF LIMIT — SHIFT LOAD FWD`;
+      worstFwd < 0
+        ? `CG ${Math.abs(worstFwd).toFixed(0)} MM FWD OF LIMIT — SHIFT LOAD AFT`
+        : `CG ${Math.abs(worstAft).toFixed(0)} MM AFT OF LIMIT — SHIFT LOAD FWD`;
   } else if (!isLatOk) {
     actionableAdvisory =
       leftMargin < 0
@@ -668,11 +738,20 @@ export function evaluateLocalMissionKinematics(
     wind_correction_angle_deg: -2.0,
     headwind_component_kts: input.headwindKts,
     crosswind_component_kts: -5.0,
-    leg_ete_minutes: legEteMinutes,
-    leg_fuel_burn_kg: legFuelBurnKg,
+    leg_ete_minutes: totalEteMinutes,
+    leg_fuel_burn_kg: missionFuelBurnKg,
     remaining_fuel_kg: remainingFuelKg,
     reserve_fuel_20min_kg: reserve20MinKg,
     reserve_margin_kg: reserveMarginKg,
+    total_distance_nm: legDistanceNm,
+    scene_hover_minutes: sceneHoverMinutes,
+    total_ete_minutes: totalEteMinutes,
+    total_fuel_burn_kg: missionFuelBurnKg,
+    is_ifr_reserve: isIfr,
+    reserve_required_minutes: reserveRequiredMinutes,
+    reserve_margin_minutes: reserveMarginMinutes,
+    crew_and_litter_kg: load.crewAndLitterKg,
+    specialty_gear_kg: load.rackKg,
     landing_gross_weight_kg: landingState.gwKg,
     landing_cg_long_mm: landingState.cgLongMm,
     landing_cg_lat_mm: landingState.cgLatMm,

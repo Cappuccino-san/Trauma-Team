@@ -9,6 +9,7 @@
   } from '../types/envelope';
   import { activeCorridor } from '../stores/verdict';
   import { activeHazards } from '../stores/weather';
+  import { activeScenarioKey } from '../simulation/fixtures';
 
   export let isOpen = false;
   export let onClose: () => void = () => {};
@@ -111,6 +112,7 @@
   function injectParsedScenario(data: any) {
     const now = new Date().toISOString();
     let seq = Date.now() % 100000;
+    activeScenarioKey.set(null);
 
     // 1. Update corridor if provided
     if (data.corridor && data.corridor.departure && data.corridor.destination) {

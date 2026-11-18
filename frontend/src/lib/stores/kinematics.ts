@@ -1,4 +1,4 @@
-import { writable, derived } from 'svelte/store';
+import { writable, derived, get } from 'svelte/store';
 import type { ServerEnvelope } from '../types/envelope';
 
 /**
@@ -68,6 +68,15 @@ export interface MissionKinematicsEvaluation {
   required_payload_reduction_kg?: number;
   additional_fuel_required_kg?: number;
   actionable_advisory?: string;
+  total_distance_nm?: number;
+  scene_hover_minutes?: number;
+  total_ete_minutes?: number;
+  total_fuel_burn_kg?: number;
+  is_ifr_reserve?: boolean;
+  reserve_required_minutes?: number;
+  reserve_margin_minutes?: number;
+  crew_and_litter_kg?: number;
+  specialty_gear_kg?: number;
 }
 
 export interface KinematicsPreset {
@@ -80,6 +89,11 @@ export interface KinematicsPreset {
   crewKg: number;
   headwindKts: number;
   legDistanceNm?: number;
+  crewBaseKg?: number;
+  crewAndLitterKg?: number;
+  specialtyGearKg?: number;
+  sceneHoverMinutes?: number;
+  isIfr?: boolean;
 }
 
 export const defaultKinematics: MissionKinematicsEvaluation = {
@@ -105,11 +119,20 @@ export const defaultKinematics: MissionKinematicsEvaluation = {
   wind_correction_angle_deg: -2.0,
   headwind_component_kts: 8.0,
   crosswind_component_kts: -5.0,
-  leg_ete_minutes: 20.8,
-  leg_fuel_burn_kg: 75.2,
-  remaining_fuel_kg: 344.8,
+  leg_ete_minutes: 56.9,
+  leg_fuel_burn_kg: 210.4,
+  remaining_fuel_kg: 209.6,
   reserve_fuel_20min_kg: 72.5,
-  reserve_margin_kg: 272.3,
+  reserve_margin_kg: 137.1,
+  total_distance_nm: 103.9,
+  scene_hover_minutes: 5,
+  total_ete_minutes: 56.9,
+  total_fuel_burn_kg: 210.4,
+  is_ifr_reserve: false,
+  reserve_required_minutes: 20,
+  reserve_margin_minutes: 37.8,
+  crew_and_litter_kg: 283,
+  specialty_gear_kg: 49,
   landing_gross_weight_kg: 2816.8,
   landing_cg_long_mm: 3860.4,
   landing_cg_lat_mm: -13.9,
@@ -154,5 +177,28 @@ export const isCgCompliant = derived(latestKinematics, ($k) => $k.mass_balance.i
 export function ingestKinematicsEnvelope(envelope: ServerEnvelope<unknown>): void {
   const payload = envelope.payload as MissionKinematicsEvaluation | undefined;
   if (!payload || typeof payload !== 'object' || !payload.mass_balance) return;
-  latestKinematics.set(payload);
+  const prev = get(latestKinematics);
+  const ff = payload.cruise_fuel_flow_kg_hr || prev.cruise_fuel_flow_kg_hr || 210;
+  const hoverMin = payload.scene_hover_minutes ?? prev.scene_hover_minutes ?? 5;
+  const isIfr = payload.is_ifr_reserve ?? prev.is_ifr_reserve ?? false;
+  const resReqMin = payload.reserve_required_minutes ?? (isIfr ? 30 : 20);
+  const resReqKg = (resReqMin / 60) * ff;
+  const resMarginKg = payload.remaining_fuel_kg - resReqKg;
+  const hoverBurn = ((hoverMin + 2) / 60) * (payload.hover_oge_fuel_flow_kg_hr || ff * 1.2);
+  const warmBurn = (2 / 60) * (payload.loiter_fuel_flow_kg_hr || ff * 0.85);
+  const totalBurn = payload.total_fuel_burn_kg ?? payload.leg_fuel_burn_kg + hoverBurn + warmBurn;
+  const totalEte = payload.total_ete_minutes ?? payload.leg_ete_minutes + hoverMin + 4;
+
+  latestKinematics.set({
+    ...payload,
+    scene_hover_minutes: hoverMin,
+    total_distance_nm: payload.total_distance_nm ?? prev.total_distance_nm,
+    total_ete_minutes: totalEte,
+    total_fuel_burn_kg: totalBurn,
+    is_ifr_reserve: isIfr,
+    reserve_required_minutes: resReqMin,
+    reserve_margin_minutes: payload.reserve_margin_minutes ?? (ff > 0 ? (resMarginKg / ff) * 60 : 0),
+    crew_and_litter_kg: payload.crew_and_litter_kg ?? prev.crew_and_litter_kg,
+    specialty_gear_kg: payload.specialty_gear_kg ?? prev.specialty_gear_kg
+  });
 }

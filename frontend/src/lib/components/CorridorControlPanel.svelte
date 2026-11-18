@@ -1,7 +1,7 @@
 <script lang="ts">
   import { activeCorridor, regulatoryContext } from '../stores/verdict';
   import { wsRouter, connectionState } from '../websocket';
-  import { loadSimulationScenario } from '../simulation/fixtures';
+  import { loadSimulationScenario, activeScenarioKey } from '../simulation/fixtures';
 
   let intermediatesText = '';
   $: intermediatesText = ($activeCorridor.intermediates || []).join(', ');
@@ -15,6 +15,9 @@
 
   function submitEvaluation() {
     syncIntermediates();
+    if ($connectionState === 'CONNECTED') {
+      activeScenarioKey.set(null);
+    }
     wsRouter.requestMinimumsEvaluation($activeCorridor, $regulatoryContext);
 
     // If not connected to live Go backend, evaluate deterministically against local simulation fixtures
@@ -55,7 +58,7 @@
 
 <section class="panel-box" aria-label="Corridor and Regulatory Matrix">
   <div class="panel-header">
-    <span>01 // CORRIDOR & 14 CFR § 135.L MATRIX</span>
+    <span>01 // CORRIDOR &amp; § 135.L MATRIX</span>
     <span>EVAL_MINIMUMS</span>
   </div>
 
@@ -65,6 +68,7 @@
         <span>DEPARTURE ICAO</span>
         <input
           type="text"
+          class="efb-touch"
           bind:value={$activeCorridor.departure}
           maxlength="4"
           aria-label="Departure Station"
@@ -75,6 +79,7 @@
         <span>INTERMEDIATES (CSV)</span>
         <input
           type="text"
+          class="efb-touch"
           bind:value={intermediatesText}
           on:change={syncIntermediates}
           aria-label="Intermediate Stations"
@@ -85,6 +90,7 @@
         <span>DESTINATION ICAO</span>
         <input
           type="text"
+          class="efb-touch"
           bind:value={$activeCorridor.destination}
           maxlength="4"
           aria-label="Destination Station"
@@ -97,6 +103,7 @@
         <span>PLANNED CRUISE (FT MSL)</span>
         <input
           type="number"
+          class="efb-touch"
           step="100"
           bind:value={$regulatoryContext.planned_cruise_alt_msl}
         />
@@ -106,6 +113,7 @@
         <span>MAX OBSTACLE (FT MSL)</span>
         <input
           type="number"
+          class="efb-touch"
           step="100"
           bind:value={$regulatoryContext.highest_obstacle_msl}
         />
@@ -115,19 +123,19 @@
     <div class="toggles-section">
       <div class="sub-header">OPERATIONAL ENVIRONMENT (§ 135.609 TABLE 1)</div>
       <div class="checkbox-grid">
-        <label class="chk-row">
+        <label class="chk-row efb-touch" class:chk-active={$regulatoryContext.is_day}>
           <input type="checkbox" bind:checked={$regulatoryContext.is_day} />
           <span>DAYLIGHT OPS</span>
         </label>
-        <label class="chk-row">
+        <label class="chk-row efb-touch" class:chk-active={$regulatoryContext.is_mountainous}>
           <input type="checkbox" bind:checked={$regulatoryContext.is_mountainous} />
           <span>MOUNTAINOUS</span>
         </label>
-        <label class="chk-row">
+        <label class="chk-row efb-touch" class:chk-active={$regulatoryContext.is_local}>
           <input type="checkbox" bind:checked={$regulatoryContext.is_local} />
           <span>LOCAL AREA</span>
         </label>
-        <label class="chk-row">
+        <label class="chk-row efb-touch" class:chk-active={$regulatoryContext.allow_opspec_a021_relief}>
           <input type="checkbox" bind:checked={$regulatoryContext.allow_opspec_a021_relief} />
           <span>OPSPEC A021</span>
         </label>
@@ -137,19 +145,19 @@
     <div class="toggles-section">
       <div class="sub-header">AVIONICS & IFR CAPABILITY (§ 135.611)</div>
       <div class="checkbox-grid">
-        <label class="chk-row">
+        <label class="chk-row efb-touch" class:chk-active={$regulatoryContext.equipment.nvg_equipped}>
           <input type="checkbox" bind:checked={$regulatoryContext.equipment.nvg_equipped} />
           <span>NVG EQUIPPED</span>
         </label>
-        <label class="chk-row">
+        <label class="chk-row efb-touch" class:chk-active={$regulatoryContext.equipment.htaws_equipped}>
           <input type="checkbox" bind:checked={$regulatoryContext.equipment.htaws_equipped} />
           <span>HTAWS ACTIVE</span>
         </label>
-        <label class="chk-row">
+        <label class="chk-row efb-touch" class:chk-active={$regulatoryContext.is_ifr_certified}>
           <input type="checkbox" bind:checked={$regulatoryContext.is_ifr_certified} />
           <span>IFR CERTIFIED</span>
         </label>
-        <label class="chk-row">
+        <label class="chk-row efb-touch" class:chk-active={$regulatoryContext.has_ifr_alternate}>
           <input type="checkbox" bind:checked={$regulatoryContext.has_ifr_alternate} />
           <span>IFR ALTERNATE</span>
         </label>
@@ -157,10 +165,10 @@
     </div>
 
     <div class="action-bar">
-      <button type="button" class="btn-primary" on:click={submitEvaluation}>
+      <button type="button" class="efb-touch btn-primary" on:click={submitEvaluation}>
         EVALUATE CORRIDOR
       </button>
-      <button type="button" on:click={subscribeCorridorStations}>
+      <button type="button" class="efb-touch" on:click={subscribeCorridorStations}>
         SUBSCRIBE ROUTE
       </button>
     </div>
@@ -233,16 +241,42 @@
   .chk-row {
     display: flex;
     align-items: center;
-    gap: 6px;
-    font-size: 11px;
+    gap: 8px;
+    min-height: 38px;
+    padding: 6px 8px;
+    background: var(--bg-void);
+    border: 1px solid var(--border-strong);
+    color: var(--text-secondary);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
     cursor: pointer;
     user-select: none;
+    transition: background-color 80ms linear, border-color 80ms linear, color 80ms linear;
+  }
+
+  .chk-row:hover {
+    background: var(--bg-active);
+    border-color: var(--text-secondary);
+    color: var(--text-primary);
+  }
+
+  .chk-row.chk-active {
+    border-color: rgba(0, 230, 118, 0.55);
+    background: rgba(0, 230, 118, 0.08);
+    color: var(--text-primary);
+  }
+
+  .chk-row:focus-within {
+    outline: 2px solid var(--color-info);
+    outline-offset: 1px;
   }
 
   .chk-row input[type='checkbox'] {
     accent-color: var(--color-go);
-    width: 13px;
-    height: 13px;
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
     cursor: pointer;
   }
 
@@ -250,12 +284,13 @@
     display: grid;
     grid-template-columns: 1.5fr 1fr;
     gap: 6px;
-    padding-top: 4px;
+    padding-top: 2px;
   }
 
   .btn-primary {
     border-color: var(--color-go);
     color: var(--color-go);
+    background: var(--color-go-bg);
   }
 
   .btn-primary:hover {

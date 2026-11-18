@@ -30,6 +30,8 @@
   --color-ifr-bg: rgba(213, 0, 249, 0.09);
   --color-mvfr: #2979ff;
   --color-mvfr-bg: rgba(41, 121, 255, 0.09);
+  --color-info: #00e5ff;
+  --color-info-bg: rgba(0, 229, 255, 0.1);
 
   --font-mono: 'JetBrains Mono', 'IBM Plex Mono', 'Fira Code', 'SFMono-Regular', Consolas, monospace;
   --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -92,6 +94,66 @@ select:focus {
   border-color: var(--color-go);
 }
 
+button:focus-visible,
+input:focus-visible,
+select:focus-visible {
+  outline: 2px solid var(--color-info);
+  outline-offset: 1px;
+}
+
+.efb-touch {
+  min-height: 38px;
+  padding: 6px 10px;
+}
+
+input[type='range'] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  min-height: 30px;
+  background: transparent;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+input[type='range']::-webkit-slider-runnable-track {
+  height: 6px;
+  background: #141923;
+  border: 1px solid var(--border-strong);
+}
+
+input[type='range']::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 22px;
+  margin-top: -9px;
+  background: var(--color-info);
+  border: 1px solid #041016;
+  cursor: grab;
+}
+
+input[type='range']:active::-webkit-slider-thumb {
+  background: var(--color-go);
+  cursor: grabbing;
+}
+
+input[type='range']::-moz-range-track {
+  height: 6px;
+  background: #141923;
+  border: 1px solid var(--border-strong);
+}
+
+input[type='range']::-moz-range-thumb {
+  width: 16px;
+  height: 22px;
+  background: var(--color-info);
+  border: 1px solid #041016;
+  border-radius: 0;
+  cursor: grab;
+}
+
 /* Utility badges */
 .cat-badge {
   display: inline-block;
@@ -126,6 +188,8 @@ select:focus {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
   padding: 6px 10px;
   background: var(--bg-elevated);
   border-bottom: 1px solid var(--border-hairline);

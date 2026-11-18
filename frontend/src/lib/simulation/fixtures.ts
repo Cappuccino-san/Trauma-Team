@@ -1,3 +1,4 @@
+import { writable } from 'svelte/store';
 import {
   ServerEvent,
   type ServerEnvelope,
@@ -6,7 +7,7 @@ import {
   type ComplianceReport
 } from '../types/envelope';
 import type { TraumaTeamWebSocketRouter } from '../websocket';
-import { activeCorridor } from '../stores/verdict';
+import { activeCorridor, regulatoryContext, defaultRegulatoryContext } from '../stores/verdict';
 import { activeHazards } from '../stores/weather';
 import {
   kinematicsPresetStore,
@@ -14,6 +15,9 @@ import {
   type KinematicsPreset
 } from '../stores/kinematics';
 import { evaluateLocalMissionKinematics } from '../rfmPhysics';
+import { computeCorridorDistanceNm } from '../stations';
+
+export const activeScenarioKey = writable<string | null>('NOMINAL_GO');
 
 /**
  * Deterministic NOAA AWC & FAA 14 CFR Part 135 Subpart L Simulation Fixtures
@@ -518,8 +522,13 @@ export const SCENARIO_KINEMATICS_PRESETS: Record<string, KinematicsPreset> = {
     fuelKg: 420,
     payloadKg: 140,
     crewKg: 192,
+    crewBaseKg: 192,
+    crewAndLitterKg: 283,
+    specialtyGearKg: 49,
+    sceneHoverMinutes: 5,
     headwindKts: 8,
-    legDistanceNm: 45
+    legDistanceNm: 103.9,
+    isIfr: false
   },
   HIGH_DA_KLXV: {
     airframe: 'Airbus H145 (BK117 D-2)',
@@ -529,8 +538,13 @@ export const SCENARIO_KINEMATICS_PRESETS: Record<string, KinematicsPreset> = {
     fuelKg: 580,
     payloadKg: 210,
     crewKg: 192,
+    crewBaseKg: 192,
+    crewAndLitterKg: 332,
+    specialtyGearKg: 70,
+    sceneHoverMinutes: 5,
     headwindKts: 12,
-    legDistanceNm: 38
+    legDistanceNm: 71.2,
+    isIfr: false
   },
   MARGINAL_CAUTION: {
     airframe: 'Airbus H145 (BK117 D-2)',
@@ -540,8 +554,13 @@ export const SCENARIO_KINEMATICS_PRESETS: Record<string, KinematicsPreset> = {
     fuelKg: 380,
     payloadKg: 120,
     crewKg: 192,
+    crewBaseKg: 192,
+    crewAndLitterKg: 270,
+    specialtyGearKg: 42,
+    sceneHoverMinutes: 5,
     headwindKts: 15,
-    legDistanceNm: 32
+    legDistanceNm: 103.9,
+    isIfr: false
   },
   ASPEN_BELOW_MINIMUMS: {
     airframe: 'Airbus H145 (BK117 D-2)',
@@ -551,8 +570,13 @@ export const SCENARIO_KINEMATICS_PRESETS: Record<string, KinematicsPreset> = {
     fuelKg: 380,
     payloadKg: 140,
     crewKg: 192,
+    crewBaseKg: 192,
+    crewAndLitterKg: 283,
+    specialtyGearKg: 49,
+    sceneHoverMinutes: 5,
     headwindKts: 10,
-    legDistanceNm: 45
+    legDistanceNm: 97.2,
+    isIfr: false
   },
   IFR_TRANSITION_REQUIRED: {
     airframe: 'Bell 429 GlobalRanger',
@@ -562,8 +586,13 @@ export const SCENARIO_KINEMATICS_PRESETS: Record<string, KinematicsPreset> = {
     fuelKg: 360,
     payloadKg: 130,
     crewKg: 180,
+    crewBaseKg: 180,
+    crewAndLitterKg: 264,
+    specialtyGearKg: 46,
+    sceneHoverMinutes: 5,
     headwindKts: 10,
-    legDistanceNm: 48
+    legDistanceNm: 97.2,
+    isIfr: true
   },
   NEW_ENGLAND_SIGMET: {
     airframe: 'Airbus H145 (BK117 D-2)',
@@ -573,8 +602,13 @@ export const SCENARIO_KINEMATICS_PRESETS: Record<string, KinematicsPreset> = {
     fuelKg: 390,
     payloadKg: 140,
     crewKg: 192,
+    crewBaseKg: 192,
+    crewAndLitterKg: 283,
+    specialtyGearKg: 49,
+    sceneHoverMinutes: 5,
     headwindKts: 20,
-    legDistanceNm: 52
+    legDistanceNm: 105.5,
+    isIfr: false
   }
 };
 
@@ -589,46 +623,73 @@ export function loadSimulationScenario(
   corridorOverride?: import('../types/envelope').CorridorParams
 ): void {
   const now = new Date().toISOString();
+  activeScenarioKey.set(String(scenarioKey));
 
   // Clear stale hazards from previous scenario before loading new scenario
   activeHazards.set([]);
 
+  let resolvedCorridor: import('../types/envelope').CorridorParams;
   if (corridorOverride && corridorOverride.departure && corridorOverride.destination) {
-    activeCorridor.set({
+    resolvedCorridor = {
       departure: corridorOverride.departure.trim().toUpperCase(),
       intermediates: (corridorOverride.intermediates || []).map((s) => s.trim().toUpperCase()).filter(Boolean),
       destination: corridorOverride.destination.trim().toUpperCase()
-    });
+    };
   } else if (scenarioKey === 'NEW_ENGLAND_SIGMET') {
-    activeCorridor.set({
+    resolvedCorridor = {
       departure: 'KBOS',
       intermediates: ['KMHT'],
       destination: 'KPWM'
-    });
+    };
   } else if (scenarioKey === 'HIGH_DA_KLXV') {
-    activeCorridor.set({
+    resolvedCorridor = {
       departure: 'KAPA',
       intermediates: [],
       destination: 'KLXV'
-    });
+    };
   } else if (scenarioKey === 'ASPEN_BELOW_MINIMUMS' || scenarioKey === 'IFR_TRANSITION_REQUIRED') {
-    activeCorridor.set({
+    resolvedCorridor = {
       departure: 'KAPA',
       intermediates: ['KLXV'],
       destination: 'KASE'
-    });
+    };
   } else {
-    activeCorridor.set({
+    resolvedCorridor = {
       departure: 'KAPA',
       intermediates: ['KDEN'],
       destination: 'KLXV'
-    });
+    };
+  }
+  activeCorridor.set(resolvedCorridor);
+
+  // Synchronize regulatory toggles cleanly with scenario assumptions
+  if (scenarioKey === 'MARGINAL_CAUTION' || scenarioKey === 'ASPEN_BELOW_MINIMUMS') {
+    regulatoryContext.update((rc) => ({ ...rc, is_day: false, is_ifr_certified: false }));
+  } else if (scenarioKey === 'IFR_TRANSITION_REQUIRED') {
+    regulatoryContext.update((rc) => ({
+      ...rc,
+      is_day: false,
+      is_ifr_certified: true,
+      has_ifr_alternate: true
+    }));
+  } else if (scenarioKey === 'NEW_ENGLAND_SIGMET') {
+    regulatoryContext.update((rc) => ({
+      ...rc,
+      is_day: true,
+      is_mountainous: false
+    }));
+  } else if (scenarioKey === 'NOMINAL_GO' || scenarioKey === 'HIGH_DA_KLXV') {
+    regulatoryContext.set(structuredClone(defaultRegulatoryContext));
   }
 
   const kinPreset = SCENARIO_KINEMATICS_PRESETS[scenarioKey];
   if (kinPreset) {
-    kinematicsPresetStore.set({ ...kinPreset });
-    latestKinematics.set(evaluateLocalMissionKinematics(kinPreset));
+    const syncedPreset: KinematicsPreset = {
+      ...kinPreset,
+      legDistanceNm: computeCorridorDistanceNm(resolvedCorridor)
+    };
+    kinematicsPresetStore.set(syncedPreset);
+    latestKinematics.set(evaluateLocalMissionKinematics(syncedPreset));
   }
 
   Object.values(FIXTURE_METARS).forEach((metar) => {

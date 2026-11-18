@@ -1,5 +1,6 @@
 <script lang="ts">
   import { latestComplianceReport, currentVerdictTier, isEvaluating } from '../stores/verdict';
+  import { formatLimitingFactorLabel } from '../aviationTerminology';
 
   function formatMargin(val: number | undefined, unit: string): string {
     if (val === undefined || val === null || Number.isNaN(val)) return '--';
@@ -22,7 +23,12 @@
         {/if}
       </div>
       <div class="tier-sub">
-        TIER: {$currentVerdictTier} // COMPLIANT: {$latestComplianceReport?.is_compliant ? 'TRUE' : 'FALSE'}
+        TIER: {$currentVerdictTier} //
+        {$latestComplianceReport
+          ? $latestComplianceReport.is_compliant
+            ? 'COMPLIANT'
+            : 'DISPATCH PROHIBITED'
+          : 'AWAITING EVALUATION'}
       </div>
     </div>
 
@@ -30,7 +36,10 @@
       <div class="metrics-matrix">
         <div class="matrix-cell">
           <span class="cell-label">LIMITING FACTOR</span>
-          <span class="cell-value factor-code" data-testid="limiting-factor">
+          <span class="cell-value factor-callout" data-testid="limiting-factor-label">
+            {formatLimitingFactorLabel($latestComplianceReport.limiting_factor)}
+          </span>
+          <span class="factor-code-tag" data-testid="limiting-factor">
             {$latestComplianceReport.limiting_factor}
           </span>
         </div>
@@ -189,8 +198,22 @@
     color: var(--text-primary);
   }
 
-  .factor-code {
+  .factor-callout {
     font-size: 11px;
+    font-weight: 800;
+    line-height: 1.25;
+  }
+
+  .factor-code-tag {
+    margin-top: 3px;
+    display: inline-block;
+    width: fit-content;
+    font-size: 9px;
+    color: var(--text-muted);
+    background: var(--bg-void);
+    border: 1px solid var(--border-hairline);
+    padding: 1px 4px;
+    letter-spacing: 0.04em;
     word-break: break-all;
   }
 
